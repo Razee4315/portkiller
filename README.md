@@ -4,8 +4,10 @@ A fast Windows utility to visualize and kill processes blocking specific ports. 
 
 ## Screenshots
 
-![Main Interface](images/demo1.png)
-![Port Killing](images/demo2.png)
+<p align="center">
+  <img src="images/demo1.png" alt="Main Interface" width="400"/>
+  <img src="images/demo2.png" alt="Port Killing" width="400"/>
+</p>
 
 ## Features
 
