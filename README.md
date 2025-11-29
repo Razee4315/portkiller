@@ -14,7 +14,7 @@ A fast Windows utility to visualize and kill processes blocking specific ports. 
 
 ## Installation
 
-Download the latest installer from [Releases](https://github.com/YOUR_USERNAME/portkiller/releases):
+Download the latest installer from [Releases](https://github.com/Razee4315/portkiller/releases):
 
 - `PortKiller_x.x.x_x64-setup.exe` - NSIS installer (recommended)
 - `PortKiller_x.x.x_x64_en-US.msi` - MSI installer
@@ -59,6 +59,13 @@ Output will be in `src-tauri/target/release/bundle/`.
 - **Frontend**: Preact + TypeScript + Tailwind CSS
 - **Port Detection**: netstat2 crate (Windows API)
 - **Process Management**: sysinfo + Windows API
+
+## Author
+
+**Saqlain Razee**
+- GitHub: [@Razee4315](https://github.com/Razee4315)
+- LinkedIn: [saqlainrazee](https://www.linkedin.com/in/saqlainrazee/)
+- Email: saqlainrazee@gmail.com
 
 ## License
 
