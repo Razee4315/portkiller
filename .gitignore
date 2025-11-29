@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+*.test.c
+*.test.rc
+test*.c
+test*.rc
+*.bat
+gcc_*.txt
+out.txt
+simple.c
+
+# Binaries (use releases instead)
+*.exe
+*.msi
+*.dll
+
+# Lock files (optional - remove if you want to commit)
+# package-lock.json

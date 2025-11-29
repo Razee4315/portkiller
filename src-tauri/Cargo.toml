@@ -1,0 +1,25 @@
+[package]
+name = "portkiller"
+version = "1.0.0"
+description = "The fastest way for developers to visualize and terminate processes locking specific ports"
+authors = ["PortKiller"]
+license = "MIT"
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+winres = "0.1"
+
+[dependencies]
+tauri = { version = "1.8", features = ["global-shortcut-all", "shell-open", "system-tray", "window-close", "window-hide", "window-show", "window-center", "window-set-focus"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+netstat2 = "0.9"
+sysinfo = "0.31"
+windows = { version = "0.58", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_Security"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

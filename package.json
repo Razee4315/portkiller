@@ -1,0 +1,30 @@
+{
+  "name": "portkiller",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "build:release": "npm run build && npm run tauri build -- --bundles none && node scripts/embed-icon.cjs && npm run tauri build -- --bundles nsis,msi --ci"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.6.0",
+    "preact": "^10.24.3"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.3",
+    "@tauri-apps/cli": "^1.6.3",
+    "autoprefixer": "^10.4.20",
+    "png-to-ico": "^3.0.1",
+    "postcss": "^8.4.49",
+    "rcedit": "^5.0.2",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.16",
+    "to-ico": "^1.1.5",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

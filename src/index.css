@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+@layer components {
+  .port-card {
+    @apply relative p-3 rounded-lg transition-all duration-200 cursor-pointer;
+    @apply hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .port-card-free {
+    @apply bg-dark-700/50 border border-dark-500;
+  }
+
+  .port-card-used {
+    @apply bg-dark-700 border border-accent-red/30;
+    @apply hover:border-accent-red/60 hover:bg-dark-600;
+  }
+
+  .input-field {
+    @apply w-full bg-dark-700 border border-dark-500 rounded-lg px-4 py-3;
+    @apply text-white placeholder-gray-500 font-mono text-lg;
+    @apply focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50;
+    @apply transition-all duration-200;
+  }
+
+  .btn {
+    @apply px-3 py-1.5 rounded-md font-medium text-sm transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-800;
+  }
+
+  .btn-danger {
+    @apply bg-accent-red/20 text-accent-red border border-accent-red/30;
+    @apply hover:bg-accent-red/30 focus:ring-accent-red/50;
+  }
+
+  .btn-ghost {
+    @apply text-gray-400 hover:text-white hover:bg-dark-500;
+  }
+
+  .toast {
+    @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg;
+    @apply text-sm font-medium shadow-lg z-50;
+    @apply animate-slide-up;
+  }
+
+  .toast-success {
+    @apply bg-accent-green/20 text-accent-green border border-accent-green/30;
+  }
+
+  .toast-error {
+    @apply bg-accent-red/20 text-accent-red border border-accent-red/30;
+  }
+
+  .list-row {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg;
+    @apply hover:bg-dark-600 transition-colors duration-150;
+  }
+
+  .list-row-protected {
+    @apply opacity-60;
+  }
+}
