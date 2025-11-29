@@ -2,6 +2,11 @@
 
 A fast Windows utility to visualize and kill processes blocking specific ports. Built with Tauri, Rust, and Preact.
 
+## Screenshots
+
+![Main Interface](images/demo1.png)
+![Port Killing](images/demo2.png)
+
 ## Features
 
 - Global hotkey (Alt+P) to show/hide overlay

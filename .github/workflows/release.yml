@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,6 +26,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-action@stable
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install dependencies
         run: npm ci
 
@@ -33,18 +42,24 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'PortKiller ${{ github.ref_name }}'
           releaseBody: |
-            ## Download
+            ## Downloads
             
-            - **NSIS Installer**: `PortKiller_x.x.x_x64-setup.exe` (recommended)
-            - **MSI Installer**: `PortKiller_x.x.x_x64_en-US.msi`
+            | File | Description |
+            |------|-------------|
+            | `PortKiller_x.x.x_x64-setup.exe` | NSIS Installer (recommended) |
+            | `PortKiller_x.x.x_x64_en-US.msi` | MSI Installer |
             
             ## Requirements
             - Windows 10/11 (x64)
             - WebView2 Runtime (auto-installed)
             
-            ## Usage
-            - Press `Alt+P` to show/hide
-            - Type port number and press `Enter` to kill
-            - Press `Esc` to hide
+            ## Quick Start
+            1. Download and run the installer
+            2. Press `Alt+P` to show the overlay
+            3. Type port number and press `Enter` to kill
+            4. Press `Esc` to hide
+            
+            ## Changelog
+            See [CHANGELOG.md](https://github.com/Razee4315/portkiller/blob/main/CHANGELOG.md)
           releaseDraft: false
           prerelease: false
