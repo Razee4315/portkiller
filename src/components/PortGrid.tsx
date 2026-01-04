@@ -23,7 +23,7 @@ export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort }: Po
             key={cp.port}
             onClick={() => portInfo && onKill(portInfo)}
             disabled={!isUsed || isKilling || isProtected}
-            className={`port-card ${isUsed ? 'port-card-used' : 'port-card-free'} ${
+            className={`port-card group ${isUsed ? 'port-card-used' : 'port-card-free'} ${
               isProtected ? 'cursor-not-allowed' : ''
             } ${isKilling ? 'animate-pulse' : ''}`}
             title={

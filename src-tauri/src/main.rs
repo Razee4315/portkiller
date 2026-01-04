@@ -7,7 +7,7 @@ use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSock
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::os::windows::process::CommandExt;
-use sysinfo::{Pid, System};
+use sysinfo::{Pid, System, ProcessRefreshKind, RefreshKind, ProcessesToUpdate};
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
     SystemTrayMenuItem, Window, AppHandle,
@@ -38,6 +38,16 @@ pub struct KillResult {
     pub success: bool,
     pub message: String,
     pub port: u16,
+}
+
+#[derive(Serialize, Clone)]
+pub struct ProcessDetails {
+    pub pid: u32,
+    pub name: String,
+    pub path: String,
+    pub memory_bytes: u64,
+    pub cpu_percent: f32,
+    pub children: Vec<u32>,
 }
 
 const PROTECTED_PROCESSES: &[&str] = &[
@@ -93,8 +103,11 @@ fn is_running_as_admin() -> bool {
 
 #[tauri::command]
 fn get_listening_ports() -> Result<AppState, String> {
-    let mut system = System::new_all();
-    system.refresh_all();
+    // Use targeted refresh for better performance
+    let mut system = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything())
+    );
+    system.refresh_processes(ProcessesToUpdate::All);
 
     let af_flags = AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6;
     let proto_flags = ProtocolFlags::TCP | ProtocolFlags::UDP;
@@ -151,6 +164,60 @@ fn get_listening_ports() -> Result<AppState, String> {
         last_updated,
         is_admin: is_running_as_admin(),
     })
+}
+
+#[tauri::command]
+fn get_process_details(pid: u32) -> Result<ProcessDetails, String> {
+    let mut system = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything())
+    );
+    system.refresh_processes(ProcessesToUpdate::All);
+
+    let sys_pid = Pid::from_u32(pid);
+    
+    if let Some(process) = system.process(sys_pid) {
+        let name = process.name().to_string_lossy().to_string();
+        let path = process.exe()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let memory_bytes = process.memory();
+        let cpu_percent = process.cpu_usage();
+        
+        // Find child processes
+        let children: Vec<u32> = system.processes()
+            .iter()
+            .filter_map(|(child_pid, child_proc)| {
+                if child_proc.parent() == Some(sys_pid) {
+                    Some(child_pid.as_u32())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(ProcessDetails {
+            pid,
+            name,
+            path,
+            memory_bytes,
+            cpu_percent,
+            children,
+        })
+    } else {
+        Err(format!("Process {} not found", pid))
+    }
+}
+
+#[tauri::command]
+fn open_task_manager() -> Result<(), String> {
+    use std::process::Command;
+    
+    Command::new("taskmgr.exe")
+        .creation_flags(0x08000000)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -309,7 +376,7 @@ fn main() {
                     }
                 }
                 "quit" => {
-                    std::process::exit(0);
+                    app.exit(0);
                 }
                 _ => {}
             },
@@ -333,6 +400,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_listening_ports,
+            get_process_details,
+            open_task_manager,
             kill_process,
             restart_as_admin,
             hide_main_window

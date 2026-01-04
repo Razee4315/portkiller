@@ -1,25 +1,97 @@
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/tauri'
 import { appWindow } from '@tauri-apps/api/window'
 import type { AppState, PortInfo, KillResult } from './types'
-import { COMMON_PORTS } from './types'
+import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
 import { Icons } from './components/Icons'
 import { PortGrid } from './components/PortGrid'
 import { PortList } from './components/PortList'
 import { Toast } from './components/Toast'
+import { DetailsPanel } from './components/DetailsPanel'
+import { ContextMenu } from './components/ContextMenu'
+import { SettingsPanel } from './components/SettingsPanel'
+
+// Fuzzy search scoring
+function fuzzyScore(query: string, target: string): number {
+  const q = query.toLowerCase()
+  const t = target.toLowerCase()
+  if (t.includes(q)) return 100 + (q.length / t.length) * 50
+  let score = 0, qIdx = 0
+  for (let i = 0; i < t.length && qIdx < q.length; i++) {
+    if (t[i] === q[qIdx]) { score += 10; qIdx++ }
+  }
+  return qIdx === q.length ? score : 0
+}
+
+function fuzzyMatch(query: string, port: PortInfo): number {
+  const scores = [
+    fuzzyScore(query, port.port.toString()) * 2,
+    fuzzyScore(query, port.process_name),
+    fuzzyScore(query, port.pid.toString()),
+  ]
+  return Math.max(...scores)
+}
+
+// Port change state tracking
+type ChangeState = 'new' | 'removed' | 'stable'
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null)
+  const [prevPorts, setPrevPorts] = useState<Map<string, PortInfo>>(new Map())
+  const [portChanges, setPortChanges] = useState<Map<string, ChangeState>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [killingPort, setKillingPort] = useState<number | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [selectedPorts, setSelectedPorts] = useState<Set<string>>(new Set())
+  const [showSettings, setShowSettings] = useState(false)
+  const [detailsPort, setDetailsPort] = useState<PortInfo | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
+  const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const fetchPorts = useCallback(async () => {
     try {
       const data = await invoke<AppState>('get_listening_ports')
+
+      // Track changes
+      if (state?.ports) {
+        const newChanges = new Map<string, ChangeState>()
+        const currentKeys = new Set(data.ports.map(p => `${p.port}-${p.pid}`))
+        const prevKeys = new Set(prevPorts.keys())
+
+        // Find new ports
+        data.ports.forEach(p => {
+          const key = `${p.port}-${p.pid}`
+          if (!prevKeys.has(key)) {
+            newChanges.set(key, 'new')
+            // Clear 'new' state after 3s
+            setTimeout(() => {
+              setPortChanges(prev => {
+                const next = new Map(prev)
+                next.delete(key)
+                return next
+              })
+            }, 3000)
+          }
+        })
+
+        // Find removed ports (flash briefly)
+        prevPorts.forEach((_, key) => {
+          if (!currentKeys.has(key)) {
+            newChanges.set(key, 'removed')
+          }
+        })
+
+        setPortChanges(prev => new Map([...prev, ...newChanges]))
+        setPrevPorts(new Map(data.ports.map(p => [`${p.port}-${p.pid}`, p])))
+      } else {
+        setPrevPorts(new Map(data.ports.map(p => [`${p.port}-${p.pid}`, p])))
+      }
+
       setState(data)
       setError(null)
     } catch (err) {
@@ -27,32 +99,141 @@ export function App() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [state?.ports, prevPorts])
 
   useEffect(() => {
     fetchPorts()
     const interval = setInterval(fetchPorts, 2000)
     return () => clearInterval(interval)
-  }, [fetchPorts])
+  }, [])
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
+  // Global keyboard handler
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      // Escape to hide
       if (e.key === 'Escape') {
+        if (contextMenu) {
+          setContextMenu(null)
+          return
+        }
+        if (detailsPort) {
+          setDetailsPort(null)
+          return
+        }
+        if (showSettings) {
+          setShowSettings(false)
+          return
+        }
         e.preventDefault()
         await appWindow.hide()
+        return
+      }
+
+      // Focus search with /
+      if (e.key === '/' && document.activeElement !== inputRef.current) {
+        e.preventDefault()
+        inputRef.current?.focus()
+        return
+      }
+
+      // Navigation with arrow keys
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedIndex(prev => Math.min(prev + 1, filteredPorts.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedIndex(prev => Math.max(prev - 1, -1))
+        return
+      }
+
+      // Kill selected with Enter (when not in input or input is empty)
+      if (e.key === 'Enter' && selectedIndex >= 0 && document.activeElement !== inputRef.current) {
+        e.preventDefault()
+        const port = filteredPorts[selectedIndex]
+        if (port) handleKill(port)
+        return
+      }
+
+      // Delete key to kill selected
+      if (e.key === 'Delete' && selectedIndex >= 0) {
+        e.preventDefault()
+        const port = filteredPorts[selectedIndex]
+        if (port) handleKill(port)
+        return
+      }
+
+      // Ctrl+A to select all
+      if (e.ctrlKey && e.key === 'a' && document.activeElement !== inputRef.current) {
+        e.preventDefault()
+        setSelectedPorts(new Set(filteredPorts.map(p => `${p.port}-${p.pid}`)))
+        return
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings])
+
+  // Scroll selected into view
+  useEffect(() => {
+    if (selectedIndex >= 0 && listRef.current) {
+      const items = listRef.current.querySelectorAll('[data-port-item]')
+      items[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [selectedIndex])
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+    const duration = type === 'error' ? 5000 : 3000
+    setTimeout(() => setToast(null), duration)
+  }
+
+  // Command palette execution
+  const executeCommand = (cmd: string): boolean => {
+    const trimmed = cmd.trim().toLowerCase()
+
+    if (trimmed === 'admin' || trimmed === 'sudo') {
+      handleRestartAsAdmin()
+      return true
+    }
+    if (trimmed === 'refresh' || trimmed === 'r') {
+      fetchPorts()
+      showToast('Refreshed port list', 'success')
+      return true
+    }
+    if (trimmed === 'clear' || trimmed === 'c') {
+      setSearchQuery('')
+      setSelectedPorts(new Set())
+      return true
+    }
+    if (trimmed === 'settings' || trimmed === 'config') {
+      setShowSettings(true)
+      return true
+    }
+    if (trimmed.startsWith('kill ')) {
+      const portNum = parseInt(trimmed.slice(5), 10)
+      if (!isNaN(portNum) && state) {
+        const portInfo = state.ports.find(p => p.port === portNum)
+        if (portInfo) {
+          handleKill(portInfo)
+          return true
+        }
+        showToast(`Port ${portNum} is not in use`, 'error')
+        return true
+      }
+    }
+    if (trimmed.startsWith('export')) {
+      handleExport(trimmed.includes('csv') ? 'csv' : 'json')
+      return true
+    }
+
+    return false
   }
 
   const handleKill = async (portInfo: PortInfo) => {
@@ -68,7 +249,7 @@ export function App() {
         port: portInfo.port,
         processName: portInfo.process_name,
       })
-      
+
       if (result.success) {
         showToast(result.message, 'success')
         setTimeout(fetchPorts, 500)
@@ -83,6 +264,33 @@ export function App() {
     }
   }
 
+  const handleBulkKill = async () => {
+    const portsToKill = filteredPorts.filter(p =>
+      selectedPorts.has(`${p.port}-${p.pid}`) && !p.is_protected
+    )
+
+    if (portsToKill.length === 0) {
+      showToast('No killable ports selected', 'error')
+      return
+    }
+
+    let killed = 0
+    for (const port of portsToKill) {
+      try {
+        const result = await invoke<KillResult>('kill_process', {
+          pid: port.pid,
+          port: port.port,
+          processName: port.process_name,
+        })
+        if (result.success) killed++
+      } catch { }
+    }
+
+    showToast(`Killed ${killed}/${portsToKill.length} processes`, killed > 0 ? 'success' : 'error')
+    setSelectedPorts(new Set())
+    setTimeout(fetchPorts, 500)
+  }
+
   const handleRestartAsAdmin = async () => {
     try {
       showToast('Restarting as Administrator...', 'success')
@@ -92,8 +300,33 @@ export function App() {
     }
   }
 
+  const handleExport = async (format: 'json' | 'csv') => {
+    if (!state) return
+
+    let content: string
+    if (format === 'json') {
+      content = JSON.stringify(state.ports, null, 2)
+    } else {
+      const headers = 'Port,PID,Protocol,Process,Path,Protected'
+      const rows = state.ports.map(p =>
+        `${p.port},${p.pid},${p.protocol},"${p.process_name}","${p.process_path}",${p.is_protected}`
+      )
+      content = [headers, ...rows].join('\n')
+    }
+
+    await navigator.clipboard.writeText(content)
+    showToast(`Copied ${state.ports.length} ports as ${format.toUpperCase()}`, 'success')
+  }
+
   const handleInputKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
+      // Try command first
+      if (executeCommand(searchQuery)) {
+        setSearchQuery('')
+        return
+      }
+
+      // Then try port number
       const portNum = parseInt(searchQuery, 10)
       if (!isNaN(portNum) && state) {
         const portInfo = state.ports.find(p => p.port === portNum)
@@ -104,21 +337,62 @@ export function App() {
         }
       }
     }
+
+    // Arrow keys to navigate list
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex(0)
+      inputRef.current?.blur()
+    }
   }
 
-  const filteredPorts = state?.ports.filter(p => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      p.port.toString().includes(query) ||
-      p.process_name.toLowerCase().includes(query) ||
-      p.pid.toString().includes(query)
-    )
-  }) || []
+  const handlePortClick = (port: PortInfo, e: MouseEvent) => {
+    const key = `${port.port}-${port.pid}`
+
+    if (e.ctrlKey || e.metaKey) {
+      // Toggle selection
+      setSelectedPorts(prev => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        return next
+      })
+    } else if (e.shiftKey && selectedIndex >= 0) {
+      // Range selection
+      const currentIdx = filteredPorts.findIndex(p => `${p.port}-${p.pid}` === key)
+      const start = Math.min(selectedIndex, currentIdx)
+      const end = Math.max(selectedIndex, currentIdx)
+      const range = filteredPorts.slice(start, end + 1).map(p => `${p.port}-${p.pid}`)
+      setSelectedPorts(new Set(range))
+    } else {
+      // Single selection
+      setSelectedPorts(new Set([key]))
+      setSelectedIndex(filteredPorts.findIndex(p => `${p.port}-${p.pid}` === key))
+    }
+  }
+
+  const handleContextMenu = (port: PortInfo, e: MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, port })
+  }
+
+  // Fuzzy filtered and sorted ports
+  const filteredPorts = useMemo(() => {
+    if (!state?.ports) return []
+    if (!searchQuery) return state.ports
+
+    return state.ports
+      .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(({ port }) => port)
+  }, [state?.ports, searchQuery])
 
   const getCommonPortStatus = (port: number): PortInfo | undefined => {
     return state?.ports.find(p => p.port === port)
   }
+
+  const allPorts = customPorts.length > 0 ? customPorts : COMMON_PORTS
 
   return (
     <div className="h-full bg-dark-800/95 backdrop-blur-sm rounded-xl border border-dark-500 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
@@ -128,6 +402,15 @@ export function App() {
           <span className="text-white font-semibold text-sm">PortKiller</span>
         </div>
         <div className="flex items-center gap-2">
+          {selectedPorts.size > 1 && (
+            <button
+              onClick={handleBulkKill}
+              className="btn btn-danger text-xs flex items-center gap-1"
+            >
+              <Icons.Trash className="w-3.5 h-3.5" />
+              <span>Kill {selectedPorts.size}</span>
+            </button>
+          )}
           {state?.is_admin ? (
             <span className="text-xs text-accent-green flex items-center gap-1">
               <Icons.ShieldCheck className="w-3.5 h-3.5" />
@@ -143,6 +426,13 @@ export function App() {
               <span>Run as Admin</span>
             </button>
           )}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="btn btn-ghost text-xs p-1"
+            title="Settings"
+          >
+            <Icons.Settings className="w-4 h-4 text-gray-400" />
+          </button>
           <span className="text-gray-500 text-xs">Esc to hide</span>
         </div>
       </header>
@@ -152,7 +442,7 @@ export function App() {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type port number to kill..."
+            placeholder="Type port, command (kill/admin/refresh), or search..."
             value={searchQuery}
             onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
             onKeyDown={handleInputKeyDown}
@@ -160,6 +450,14 @@ export function App() {
             autoFocus
           />
           <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+            >
+              <Icons.Kill className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -169,7 +467,7 @@ export function App() {
           <span className="text-gray-500 text-xs">{state?.ports.length || 0} listening</span>
         </div>
         <PortGrid
-          commonPorts={COMMON_PORTS}
+          commonPorts={allPorts}
           getPortStatus={getCommonPortStatus}
           onKill={handleKill}
           killingPort={killingPort}
@@ -177,13 +475,29 @@ export function App() {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="px-4 py-2 border-b border-dark-700">
+        <div className="px-4 py-2 border-b border-dark-700 flex items-center justify-between">
           <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">
             {searchQuery ? 'Search Results' : 'All Listening Ports'}
           </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExport('json')}
+              className="text-gray-500 hover:text-white text-xs"
+              title="Copy as JSON"
+            >
+              JSON
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="text-gray-500 hover:text-white text-xs"
+              title="Copy as CSV"
+            >
+              CSV
+            </button>
+          </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto px-4 py-2">
+
+        <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-2">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Icons.Spinner className="w-6 h-6 text-gray-500 animate-spin" />
@@ -208,12 +522,49 @@ export function App() {
               ports={filteredPorts}
               onKill={handleKill}
               killingPort={killingPort}
+              selectedIndex={selectedIndex}
+              selectedPorts={selectedPorts}
+              portChanges={portChanges}
+              onPortClick={handlePortClick}
+              onContextMenu={handleContextMenu}
+              onShowDetails={setDetailsPort}
             />
           )}
         </div>
       </div>
 
-      {toast && <Toast message={toast.message} type={toast.type} />}
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+
+      {detailsPort && (
+        <DetailsPanel
+          port={detailsPort}
+          onClose={() => setDetailsPort(null)}
+          onKill={handleKill}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          port={contextMenu.port}
+          onClose={() => setContextMenu(null)}
+          onKill={handleKill}
+          onShowDetails={setDetailsPort}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPanel
+          customPorts={customPorts}
+          onSave={(ports) => {
+            setCustomPorts(ports)
+            saveCustomPorts(ports)
+            setShowSettings(false)
+          }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   )
 }

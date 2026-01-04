@@ -36,3 +36,36 @@ export const COMMON_PORTS: CommonPort[] = [
   { port: 3001, label: '3001', description: 'Dev Server' },
   { port: 5173, label: '5173', description: 'Vite' },
 ];
+
+const CUSTOM_PORTS_KEY = 'portkiller_custom_ports';
+
+export function loadCustomPorts(): CommonPort[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_PORTS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch { }
+  return [];
+}
+
+export function saveCustomPorts(ports: CommonPort[]): void {
+  try {
+    if (ports.length === 0) {
+      localStorage.removeItem(CUSTOM_PORTS_KEY);
+    } else {
+      localStorage.setItem(CUSTOM_PORTS_KEY, JSON.stringify(ports));
+    }
+  } catch { }
+}
+
+export type ChangeState = 'new' | 'removed' | 'stable';
+
+export interface ProcessDetails {
+  pid: number;
+  name: string;
+  path: string;
+  memory_bytes: number;
+  cpu_percent: number;
+  children: number[];
+}
