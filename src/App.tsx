@@ -411,16 +411,17 @@ export function App() {
 
   const allPorts = customPorts.length > 0 ? customPorts : COMMON_PORTS
 
-  // Use Tauri API for reliable window dragging
-  const startDrag = async (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return
-    await appWindow.startDragging()
+  // Use Tauri API for window dragging (must be synchronous, no await)
+  const startDrag = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a, input, select, textarea')) return
+    appWindow.startDragging()
   }
 
   return (
     <div className="h-full bg-dark-900 rounded-xl border border-dark-500 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
       {/* Draggable title bar with window controls */}
       <header
+        data-tauri-drag-region
         onMouseDown={startDrag}
         className="flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
       >
@@ -581,6 +582,7 @@ export function App() {
       {/* Footer status bar */}
       {state && (
         <footer
+          data-tauri-drag-region
           onMouseDown={startDrag}
           className="px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-500 bg-black select-none cursor-grab active:cursor-grabbing"
         >

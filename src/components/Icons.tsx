@@ -6,13 +6,13 @@ interface IconProps {
 
 export const Icons = {
   Logo: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 512 512" fill="none" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="256" cy="256" r="200" stroke="currentColor" strokeWidth="32"/>
-      <line x1="256" y1="56" x2="256" y2="156" stroke="currentColor" strokeWidth="32"/>
-      <line x1="256" y1="356" x2="256" y2="456" stroke="currentColor" strokeWidth="32"/>
-      <line x1="56" y1="256" x2="156" y2="256" stroke="currentColor" strokeWidth="32"/>
-      <line x1="356" y1="256" x2="456" y2="256" stroke="currentColor" strokeWidth="32"/>
-      <path d="M200 200L280 256L200 312" stroke="#ff4136" strokeWidth="40"/>
+    <svg className={className} viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+      <line x1="12" y1="3" x2="12" y2="7" stroke="currentColor" strokeWidth="1.8"/>
+      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="1.8"/>
+      <line x1="3" y1="12" x2="7" y2="12" stroke="currentColor" strokeWidth="1.8"/>
+      <line x1="17" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1.8"/>
+      <path d="M9.5 9L13.5 12L9.5 15" stroke="#ff4136" strokeWidth="2.2"/>
     </svg>
   ),
 
