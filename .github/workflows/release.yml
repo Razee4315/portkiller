@@ -1,20 +1,48 @@
-name: Build and Release
+name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: windows-latest
-    
+  # First: check if this version already has a release (cheap, runs on ubuntu)
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if version tag exists
+        id: check
+        run: |
+          VERSION=$(jq -r '.package.version' src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if git tag -l "v$VERSION" | grep -q "v$VERSION"; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "::notice::Tag v$VERSION already exists — skipping release"
+          else
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "::notice::New version v$VERSION detected — will build and release"
+          fi
+
+  # Second: build and release only if version is new
+  release:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -23,37 +51,38 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Setup Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
+      - name: Build and Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'PortKiller ${{ github.ref_name }}'
+          tagName: v__VERSION__
+          releaseName: 'PortKiller v__VERSION__'
           releaseBody: |
-            ## Downloads
-            
-            | File | Description |
-            |------|-------------|
-            | `PortKiller_x.x.x_x64-setup.exe` | NSIS Installer (recommended) |
-            | `PortKiller_x.x.x_x64_en-US.msi` | MSI Installer |
-            
-            ## Requirements
+            ## PortKiller v__VERSION__
+
+            Download the installer below to get started.
+
+            ### Installation
+            - **`.msi`** — Standard Windows installer
+            - **`.exe`** — NSIS installer (recommended)
+
+            ### Requirements
             - Windows 10/11 (x64)
             - WebView2 Runtime (auto-installed)
-            
-            ## Quick Start
+
+            ### Quick Start
             1. Download and run the installer
             2. Press `Alt+P` to show the overlay
             3. Type port number and press `Enter` to kill
