@@ -58,9 +58,9 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-800 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-600 bg-dark-900/50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
+            <div className="bg-dark-800 border border-white/[0.08] rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-dark-900/60">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Settings</span>
@@ -117,7 +117,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                         </div>
                     </div>
 
-                    <div className="border-t border-dark-600 pt-4">
+                    <div className="border-t border-white/[0.06] pt-4">
                         <span className="text-gray-400 text-sm font-medium block mb-2">Add New Port</span>
                         <div className="flex gap-2">
                             <input
@@ -147,7 +147,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                     </div>
                 </div>
 
-                <div className="flex gap-2 p-4 border-t border-dark-600">
+                <div className="flex gap-2 p-4 border-t border-white/[0.06]">
                     <button
                         onClick={onClose}
                         className="btn btn-ghost flex-1"

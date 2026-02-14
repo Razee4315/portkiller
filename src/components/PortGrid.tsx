@@ -34,18 +34,18 @@ export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort }: Po
                 : 'Port is free'
             }
           >
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-0.5">
               <div className="flex items-center gap-1.5">
                 {isUsed ? (
-                  <Icons.DotUsed className="w-2.5 h-2.5 text-accent-red" />
+                  <Icons.DotUsed className="w-1.5 h-1.5 text-accent-red" />
                 ) : (
-                  <Icons.DotFree className="w-2.5 h-2.5 text-accent-green opacity-50" />
+                  <Icons.DotFree className="w-1.5 h-1.5 text-accent-green/40" />
                 )}
-                <span className={`text-sm font-semibold ${isUsed ? 'text-white' : 'text-gray-500'}`}>
+                <span className={`text-xs font-semibold ${isUsed ? 'text-white/90' : 'text-gray-600'}`}>
                   {cp.label}
                 </span>
               </div>
-              <span className="text-[10px] text-gray-500 truncate max-w-full">
+              <span className="text-[9px] text-gray-600 truncate max-w-full">
                 {isUsed ? portInfo?.process_name.replace('.exe', '') : cp.description}
               </span>
             </div>

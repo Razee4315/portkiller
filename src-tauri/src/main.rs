@@ -393,9 +393,6 @@ fn main() {
                 })
                 .expect("Failed to register global shortcut");
 
-            // NO auto-hide on focus loss - only hide via Esc, Alt+P, or tray
-            // This prevents the flickering issue
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

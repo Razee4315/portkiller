@@ -14,105 +14,101 @@
 
 @layer components {
   .port-card {
-    @apply relative p-3 rounded-lg transition-all duration-200 cursor-pointer;
+    @apply relative p-2.5 rounded-lg transition-all duration-200 cursor-pointer;
     @apply hover:scale-[1.02] active:scale-[0.98];
   }
 
   .port-card-free {
-    @apply bg-dark-700/50 border border-dark-500;
+    @apply bg-dark-700/30 border border-white/[0.04];
   }
 
   .port-card-used {
-    @apply bg-dark-700 border border-accent-red/30;
-    @apply hover:border-accent-red/60 hover:bg-dark-600;
+    @apply bg-dark-700/60 border border-accent-red/20;
+    @apply hover:border-accent-red/40 hover:bg-dark-600/60;
   }
 
   .input-field {
-    @apply w-full bg-dark-700 border border-dark-500 rounded-lg px-4 py-3;
-    @apply text-white placeholder-gray-500 font-mono text-lg;
-    @apply focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50;
+    @apply w-full bg-dark-700/60 border border-white/[0.06] rounded-lg px-4 py-2.5;
+    @apply text-white text-sm placeholder-gray-600 font-mono;
+    @apply focus:outline-none focus:border-accent-blue/40 focus:ring-1 focus:ring-accent-blue/20;
     @apply transition-all duration-200;
   }
 
   .btn {
-    @apply px-3 py-1.5 rounded-md font-medium text-sm transition-all duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-800;
+    @apply px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-800;
   }
 
   .btn-danger {
-    @apply bg-accent-red/20 text-accent-red border border-accent-red/30;
-    @apply hover:bg-accent-red/30 focus:ring-accent-red/50;
+    @apply bg-accent-red/15 text-accent-red border border-accent-red/20;
+    @apply hover:bg-accent-red/25 hover:border-accent-red/30 focus:ring-accent-red/30;
   }
 
   .btn-ghost {
-    @apply text-gray-400 hover:text-white hover:bg-dark-500;
+    @apply text-gray-400 hover:text-white hover:bg-white/[0.06];
   }
 
   .toast {
     @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg;
-    @apply text-sm font-medium shadow-lg z-50 cursor-pointer;
-    @apply animate-slide-up;
+    @apply text-xs font-medium shadow-lg z-50 cursor-pointer;
+    @apply animate-slide-up backdrop-blur-sm;
   }
 
   .toast-success {
-    @apply bg-accent-green/20 text-accent-green border border-accent-green/30;
+    @apply bg-accent-green/15 text-accent-green border border-accent-green/20;
   }
 
   .toast-error {
-    @apply bg-accent-red/20 text-accent-red border border-accent-red/30;
+    @apply bg-accent-red/15 text-accent-red border border-accent-red/20;
   }
 
   .list-row {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg;
-    @apply hover:bg-dark-600 transition-colors duration-150;
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg;
+    @apply hover:bg-white/[0.03] transition-all duration-150;
   }
 
   .list-row-protected {
-    @apply opacity-60;
+    @apply opacity-50;
   }
 
-  /* Selection styles */
   .list-row-selected {
-    @apply bg-dark-500 ring-1 ring-accent-blue/50;
+    @apply bg-white/[0.05] ring-1 ring-accent-blue/30;
   }
 
-  /* Change state styles */
   .port-new {
-    @apply bg-accent-green/10 border-l-2 border-l-accent-green;
+    @apply bg-accent-green/[0.06] border-l-2 border-l-accent-green;
   }
 
   .port-removed {
-    @apply bg-accent-red/10 opacity-50;
+    @apply bg-accent-red/[0.06] opacity-50;
   }
 
-  /* Modal overlay */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50;
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
     @apply flex items-center justify-center;
   }
 
   .modal-content {
-    @apply bg-dark-800 border border-dark-500 rounded-xl;
+    @apply bg-dark-800 border border-white/[0.08] rounded-xl;
     @apply shadow-2xl overflow-hidden;
   }
 }
 
 @layer utilities {
-  /* Custom scrollbar */
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
+  ::-webkit-scrollbar {
+    width: 5px;
   }
-  
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: #1a1a1a;
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
-  
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #333;
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
     border-radius: 3px;
   }
-  
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #444;
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.14);
   }
 }

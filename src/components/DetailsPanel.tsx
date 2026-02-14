@@ -67,9 +67,9 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-800 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-600 bg-dark-900/50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
+            <div className="bg-dark-800 border border-white/[0.08] rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-dark-900/60">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Process Details</span>
@@ -148,7 +148,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                 </div>
                             </div>
 
-                            <div className="flex gap-2 pt-2 border-t border-dark-600">
+                            <div className="flex gap-2 pt-2 border-t border-white/[0.06]">
                                 {port.process_path && (
                                     <button
                                         onClick={openFolder}
