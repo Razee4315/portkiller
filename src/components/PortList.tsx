@@ -59,17 +59,17 @@ export function PortList({
 
               <div className="flex flex-col min-w-0 flex-1 gap-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-white/90 font-semibold text-xs">:{portInfo.port}</span>
-                  <span className="text-gray-600 text-[10px] px-1.5 py-px bg-white/[0.04] rounded">
+                  <span className="text-white font-semibold text-xs">:{portInfo.port}</span>
+                  <span className="text-gray-400 text-[10px] px-1.5 py-px bg-dark-600 rounded">
                     {portInfo.protocol}
                   </span>
                   {changeState === 'new' && (
                     <span className="text-accent-green text-[10px] font-medium">NEW</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-500 truncate">
+                <div className="flex items-center gap-2 text-[11px] text-gray-400 truncate">
                   <span className="truncate">{portInfo.process_name}</span>
-                  <span className="text-gray-700">PID {portInfo.pid}</span>
+                  <span className="text-gray-500">PID {portInfo.pid}</span>
                 </div>
               </div>
             </div>
@@ -78,14 +78,14 @@ export function PortList({
               {onShowDetails && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowDetails(portInfo) }}
-                  className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/[0.06] text-gray-500 hover:text-gray-300 transition-all"
+                  className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-dark-600 text-gray-400 hover:text-white transition-all"
                   title="View details"
                 >
                   <Icons.Process className="w-3.5 h-3.5" />
                 </button>
               )}
               {isProtected ? (
-                <div className="flex items-center gap-1 text-[10px] text-accent-yellow/60 px-2">
+                <div className="flex items-center gap-1 text-[10px] text-accent-yellow px-2">
                   <Icons.ShieldCheck className="w-3.5 h-3.5" />
                   <span>Protected</span>
                 </div>

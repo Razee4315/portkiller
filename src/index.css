@@ -19,52 +19,52 @@
   }
 
   .port-card-free {
-    @apply bg-dark-700/30 border border-white/[0.04];
+    @apply bg-dark-800 border border-dark-600;
   }
 
   .port-card-used {
-    @apply bg-dark-700/60 border border-accent-red/20;
-    @apply hover:border-accent-red/40 hover:bg-dark-600/60;
+    @apply bg-dark-800 border border-accent-red/25;
+    @apply hover:border-accent-red/50 hover:bg-dark-700;
   }
 
   .input-field {
-    @apply w-full bg-dark-700/60 border border-white/[0.06] rounded-lg px-4 py-2.5;
-    @apply text-white text-sm placeholder-gray-600 font-mono;
-    @apply focus:outline-none focus:border-accent-blue/40 focus:ring-1 focus:ring-accent-blue/20;
+    @apply w-full bg-dark-800 border border-dark-500 rounded-lg px-4 py-2.5;
+    @apply text-white text-sm placeholder-gray-500 font-mono;
+    @apply focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/25;
     @apply transition-all duration-200;
   }
 
   .btn {
     @apply px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-800;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-900;
   }
 
   .btn-danger {
-    @apply bg-accent-red/15 text-accent-red border border-accent-red/20;
-    @apply hover:bg-accent-red/25 hover:border-accent-red/30 focus:ring-accent-red/30;
+    @apply bg-accent-red/15 text-accent-red border border-accent-red/25;
+    @apply hover:bg-accent-red/25 hover:border-accent-red/40 focus:ring-accent-red/30;
   }
 
   .btn-ghost {
-    @apply text-gray-400 hover:text-white hover:bg-white/[0.06];
+    @apply text-gray-300 hover:text-white hover:bg-dark-600;
   }
 
   .toast {
     @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg;
     @apply text-xs font-medium shadow-lg z-50 cursor-pointer;
-    @apply animate-slide-up backdrop-blur-sm;
+    @apply animate-slide-up;
   }
 
   .toast-success {
-    @apply bg-accent-green/15 text-accent-green border border-accent-green/20;
+    @apply bg-accent-green/15 text-accent-green border border-accent-green/25;
   }
 
   .toast-error {
-    @apply bg-accent-red/15 text-accent-red border border-accent-red/20;
+    @apply bg-accent-red/15 text-accent-red border border-accent-red/25;
   }
 
   .list-row {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg;
-    @apply hover:bg-white/[0.03] transition-all duration-150;
+    @apply hover:bg-dark-700 transition-all duration-150;
   }
 
   .list-row-protected {
@@ -72,24 +72,24 @@
   }
 
   .list-row-selected {
-    @apply bg-white/[0.05] ring-1 ring-accent-blue/30;
+    @apply bg-dark-700 ring-1 ring-accent-blue/40;
   }
 
   .port-new {
-    @apply bg-accent-green/[0.06] border-l-2 border-l-accent-green;
+    @apply bg-accent-green/[0.08] border-l-2 border-l-accent-green;
   }
 
   .port-removed {
-    @apply bg-accent-red/[0.06] opacity-50;
+    @apply bg-accent-red/[0.08] opacity-50;
   }
 
   .modal-overlay {
-    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
+    @apply fixed inset-0 bg-black/70 z-50;
     @apply flex items-center justify-center;
   }
 
   .modal-content {
-    @apply bg-dark-800 border border-white/[0.08] rounded-xl;
+    @apply bg-dark-900 border border-dark-500 rounded-xl;
     @apply shadow-2xl overflow-hidden;
   }
 }
@@ -104,11 +104,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: #333;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: #444;
   }
 }

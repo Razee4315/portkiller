@@ -35,17 +35,6 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
         setPorts(ports.filter(p => p.port !== port))
     }
 
-    const movePort = (index: number, direction: 'up' | 'down') => {
-        const newIndex = direction === 'up' ? index - 1 : index + 1
-        if (newIndex < 0 || newIndex >= ports.length) return
-
-        const newPorts = [...ports]
-        const temp = newPorts[index]
-        newPorts[index] = newPorts[newIndex]
-        newPorts[newIndex] = temp
-        setPorts(newPorts)
-    }
-
     const resetToDefault = () => {
         setPorts([...COMMON_PORTS])
     }
@@ -58,9 +47,9 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
     }
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-800 border border-white/[0.08] rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-dark-900/60">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
+            <div className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Settings</span>
@@ -83,41 +72,25 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                         </div>
 
                         <div className="space-y-1 max-h-48 overflow-y-auto">
-                            {ports.map((port, index) => (
+                            {ports.map((port) => (
                                 <div
                                     key={port.port}
                                     className="flex items-center gap-2 bg-dark-700 rounded px-3 py-2"
                                 >
                                     <span className="text-white font-mono text-sm w-16">{port.port}</span>
                                     <span className="text-gray-400 text-sm flex-1 truncate">{port.description}</span>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={() => movePort(index, 'up')}
-                                            disabled={index === 0}
-                                            className="text-gray-500 hover:text-white disabled:opacity-30"
-                                        >
-                                            ↑
-                                        </button>
-                                        <button
-                                            onClick={() => movePort(index, 'down')}
-                                            disabled={index === ports.length - 1}
-                                            className="text-gray-500 hover:text-white disabled:opacity-30"
-                                        >
-                                            ↓
-                                        </button>
-                                        <button
-                                            onClick={() => removePort(port.port)}
-                                            className="text-gray-500 hover:text-accent-red ml-1"
-                                        >
-                                            <Icons.Kill className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => removePort(port.port)}
+                                        className="text-gray-400 hover:text-accent-red transition-colors"
+                                    >
+                                        <Icons.Kill className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="border-t border-white/[0.06] pt-4">
+                    <div className="border-t border-dark-500 pt-4">
                         <span className="text-gray-400 text-sm font-medium block mb-2">Add New Port</span>
                         <div className="flex gap-2">
                             <input
@@ -147,7 +120,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                     </div>
                 </div>
 
-                <div className="flex gap-2 p-4 border-t border-white/[0.06]">
+                <div className="flex gap-2 p-4 border-t border-dark-500">
                     <button
                         onClick={onClose}
                         className="btn btn-ghost flex-1"

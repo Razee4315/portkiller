@@ -6,12 +6,13 @@ interface IconProps {
 
 export const Icons = {
   Logo: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="8" y1="12" x2="16" y2="12" />
-      <line x1="12" y1="8" x2="12" y2="16" />
-      <line x1="12" y1="8" x2="12" y2="16" transform="rotate(45 12 12)" />
-      <line x1="12" y1="8" x2="12" y2="16" transform="rotate(-45 12 12)" />
+    <svg className={className} viewBox="0 0 512 512" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="256" cy="256" r="200" stroke="currentColor" strokeWidth="32"/>
+      <line x1="256" y1="56" x2="256" y2="156" stroke="currentColor" strokeWidth="32"/>
+      <line x1="256" y1="356" x2="256" y2="456" stroke="currentColor" strokeWidth="32"/>
+      <line x1="56" y1="256" x2="156" y2="256" stroke="currentColor" strokeWidth="32"/>
+      <line x1="356" y1="256" x2="456" y2="256" stroke="currentColor" strokeWidth="32"/>
+      <path d="M200 200L280 256L200 312" stroke="#ff4136" strokeWidth="40"/>
     </svg>
   ),
 

@@ -67,9 +67,9 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
     }
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-800 border border-white/[0.08] rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-dark-900/60">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
+            <div className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Process Details</span>
@@ -88,15 +88,15 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                         <>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-start">
-                                    <span className="text-gray-500 text-sm">Port</span>
+                                    <span className="text-gray-400 text-sm">Port</span>
                                     <span className="text-white font-mono text-sm">:{port.port}</span>
                                 </div>
                                 <div className="flex justify-between items-start">
-                                    <span className="text-gray-500 text-sm">Protocol</span>
+                                    <span className="text-gray-400 text-sm">Protocol</span>
                                     <span className="text-white text-sm">{port.protocol}</span>
                                 </div>
                                 <div className="flex justify-between items-start">
-                                    <span className="text-gray-500 text-sm">PID</span>
+                                    <span className="text-gray-400 text-sm">PID</span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-white font-mono text-sm">{port.pid}</span>
                                         <button
@@ -109,12 +109,12 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-start">
-                                    <span className="text-gray-500 text-sm">Process</span>
+                                    <span className="text-gray-400 text-sm">Process</span>
                                     <span className="text-white text-sm truncate max-w-[200px]">{port.process_name}</span>
                                 </div>
                                 {port.process_path && (
                                     <div>
-                                        <span className="text-gray-500 text-sm block mb-1">Path</span>
+                                        <span className="text-gray-400 text-sm block mb-1">Path</span>
                                         <p className="text-gray-400 text-xs font-mono bg-dark-700 p-2 rounded break-all">
                                             {port.process_path}
                                         </p>
@@ -123,32 +123,32 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                 {details && (
                                     <>
                                         <div className="flex justify-between items-start">
-                                            <span className="text-gray-500 text-sm">Memory</span>
+                                            <span className="text-gray-400 text-sm">Memory</span>
                                             <span className="text-white text-sm">{formatBytes(details.memory_bytes)}</span>
                                         </div>
                                         {details.cpu_percent > 0 && (
                                             <div className="flex justify-between items-start">
-                                                <span className="text-gray-500 text-sm">CPU</span>
+                                                <span className="text-gray-400 text-sm">CPU</span>
                                                 <span className="text-white text-sm">{details.cpu_percent.toFixed(1)}%</span>
                                             </div>
                                         )}
                                         {details.children.length > 0 && (
                                             <div className="flex justify-between items-start">
-                                                <span className="text-gray-500 text-sm">Children</span>
+                                                <span className="text-gray-400 text-sm">Children</span>
                                                 <span className="text-white text-sm">{details.children.length} processes</span>
                                             </div>
                                         )}
                                     </>
                                 )}
                                 <div className="flex justify-between items-start">
-                                    <span className="text-gray-500 text-sm">Status</span>
+                                    <span className="text-gray-400 text-sm">Status</span>
                                     <span className={`text-sm ${port.is_protected ? 'text-accent-yellow' : 'text-accent-green'}`}>
                                         {port.is_protected ? 'Protected' : 'Killable'}
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="flex gap-2 pt-2 border-t border-white/[0.06]">
+                            <div className="flex gap-2 pt-2 border-t border-dark-500">
                                 {port.process_path && (
                                     <button
                                         onClick={openFolder}
