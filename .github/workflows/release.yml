@@ -10,40 +10,41 @@ permissions:
   contents: write
 
 jobs:
-  # First: check if this version already has a release (cheap, runs on ubuntu)
-  check-version:
-    runs-on: ubuntu-latest
-    outputs:
-      should_release: ${{ steps.check.outputs.should_release }}
-      version: ${{ steps.check.outputs.version }}
+  release:
+    runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if version tag exists
-        id: check
+      - name: Auto-increment version
+        id: version
+        shell: bash
         run: |
-          VERSION=$(jq -r '.package.version' src-tauri/tauri.conf.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if git tag -l "v$VERSION" | grep -q "v$VERSION"; then
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "::notice::Tag v$VERSION already exists — skipping release"
+          # Get the latest version tag, sorted by semver
+          LATEST_TAG=$(git tag -l "v*" --sort=-v:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEW_VERSION="1.0.0"
           else
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "::notice::New version v$VERSION detected — will build and release"
+            VERSION=${LATEST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           fi
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Building and releasing v$NEW_VERSION (previous: ${LATEST_TAG:-none})"
 
-  # Second: build and release only if version is new
-  release:
-    needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Update version in config files
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          # Update tauri.conf.json
+          jq --arg v "$VERSION" '.package.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          # Update Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          echo "Updated version to $VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
