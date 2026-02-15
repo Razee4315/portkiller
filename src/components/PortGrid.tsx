@@ -41,11 +41,11 @@ export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort }: Po
                 ) : (
                   <Icons.DotFree className="w-1.5 h-1.5 text-accent-green/40" />
                 )}
-                <span className={`text-xs font-semibold ${isUsed ? 'text-white' : 'text-gray-400'}`}>
+                <span className={`text-xs font-semibold ${isUsed ? 'text-white' : 'text-gray-300'}`}>
                   {cp.label}
                 </span>
               </div>
-              <span className={`text-[9px] truncate max-w-full ${isUsed ? 'text-gray-400' : 'text-gray-500'}`}>
+              <span className={`text-[9px] truncate max-w-full ${isUsed ? 'text-gray-300' : 'text-gray-400'}`}>
                 {isUsed ? portInfo?.process_name.replace('.exe', '') : cp.description}
               </span>
             </div>

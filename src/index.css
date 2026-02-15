@@ -39,7 +39,7 @@
 
   .input-field {
     @apply w-full bg-dark-800 border border-dark-500 rounded-lg px-4 py-2.5;
-    @apply text-white text-sm placeholder-gray-500 font-mono;
+    @apply text-white text-sm placeholder-gray-400 font-mono;
     @apply focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/25;
     @apply transition-all duration-200;
   }

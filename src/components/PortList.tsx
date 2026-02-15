@@ -67,9 +67,9 @@ export function PortList({
                     <span className="text-accent-green text-[10px] font-medium">NEW</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-400 truncate">
+                <div className="flex items-center gap-2 text-[11px] text-gray-300 truncate">
                   <span className="truncate">{portInfo.process_name}</span>
-                  <span className="text-gray-500">PID {portInfo.pid}</span>
+                  <span className="text-gray-400">PID {portInfo.pid}</span>
                 </div>
               </div>
             </div>

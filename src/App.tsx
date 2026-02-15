@@ -52,6 +52,8 @@ export function App() {
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  const footerRef = useRef<HTMLElement>(null)
 
   const fetchPorts = useCallback(async () => {
     try {
@@ -411,23 +413,34 @@ export function App() {
 
   const allPorts = customPorts.length > 0 ? customPorts : COMMON_PORTS
 
-  // Use Tauri API for window dragging (must be synchronous, no await)
-  const startDrag = (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, a, input, select, textarea')) return
-    appWindow.startDragging()
-  }
+  // Window dragging via native DOM listeners (bypasses Preact's synthetic events)
+  useEffect(() => {
+    const handleDrag = (e: Event) => {
+      if ((e.target as HTMLElement).closest('button, a, input, select, textarea')) return
+      e.preventDefault()
+      appWindow.startDragging()
+    }
+    const header = headerRef.current
+    const footer = footerRef.current
+    header?.addEventListener('mousedown', handleDrag)
+    footer?.addEventListener('mousedown', handleDrag)
+    return () => {
+      header?.removeEventListener('mousedown', handleDrag)
+      footer?.removeEventListener('mousedown', handleDrag)
+    }
+  }, [])
 
   return (
     <div className="h-full bg-dark-900 rounded-xl border border-dark-500 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
       {/* Draggable title bar with window controls */}
       <header
+        ref={headerRef}
         data-tauri-drag-region
-        onMouseDown={startDrag}
         className="flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0 pointer-events-none">
           <Icons.Logo className="w-5 h-5 text-white flex-shrink-0" />
-          <span className="text-gray-300 font-medium text-[11px] tracking-widest uppercase">
+          <span className="text-white font-medium text-[11px] tracking-widest uppercase">
             PortKiller
           </span>
           {selectedPorts.size > 1 && (
@@ -440,7 +453,7 @@ export function App() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 pointer-events-auto">
           {state?.is_admin ? (
             <span className="text-[10px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
               <Icons.ShieldCheck className="w-3 h-3" />
@@ -458,21 +471,21 @@ export function App() {
           )}
           <button
             onClick={() => setShowSettings(true)}
-            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors"
             title="Settings"
           >
             <Icons.Settings className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={async () => await appWindow.hide()}
-            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors"
             title="Minimize to tray"
           >
             <Icons.Minimize className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={async () => await appWindow.hide()}
-            className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-400 hover:text-accent-red transition-colors"
+            className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-300 hover:text-accent-red transition-colors"
             title="Close"
           >
             <Icons.Kill className="w-3.5 h-3.5" />
@@ -493,11 +506,11 @@ export function App() {
             className="input-field pl-9"
             autoFocus
           />
-          <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
             >
               <Icons.Kill className="w-3.5 h-3.5" />
             </button>
@@ -508,8 +521,8 @@ export function App() {
       {/* Common ports grid */}
       <div className="px-3 py-3 border-b border-dark-500">
         <div className="flex items-center justify-between mb-2.5">
-          <span className="text-gray-400 text-[10px] font-medium uppercase tracking-widest">Common Ports</span>
-          <span className="text-gray-500 text-[10px]">{state?.ports.length || 0} listening</span>
+          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">Common Ports</span>
+          <span className="text-gray-400 text-[10px]">{state?.ports.length || 0} listening</span>
         </div>
         <PortGrid
           commonPorts={allPorts}
@@ -522,20 +535,20 @@ export function App() {
       {/* Port list */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between">
-          <span className="text-gray-400 text-[10px] font-medium uppercase tracking-widest">
+          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">
             {searchQuery ? 'Search Results' : 'All Listening Ports'}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleExport('json')}
-              className="text-gray-500 hover:text-white text-[10px] uppercase tracking-wider transition-colors"
+              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors"
               title="Copy as JSON"
             >
               JSON
             </button>
             <button
               onClick={() => handleExport('csv')}
-              className="text-gray-500 hover:text-white text-[10px] uppercase tracking-wider transition-colors"
+              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors"
               title="Copy as CSV"
             >
               CSV
@@ -546,20 +559,20 @@ export function App() {
         <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-2">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <Icons.Spinner className="w-5 h-5 text-gray-400 animate-spin" />
+              <Icons.Spinner className="w-5 h-5 text-white animate-spin" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">
               <Icons.Warning className="w-6 h-6 text-accent-yellow mb-2" />
-              <p className="text-gray-300 text-xs">{error}</p>
+              <p className="text-white text-xs">{error}</p>
               <button onClick={fetchPorts} className="btn btn-ghost mt-2 text-xs">
                 Retry
               </button>
             </div>
           ) : filteredPorts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">
-              <Icons.Empty className="w-6 h-6 text-gray-500 mb-2" />
-              <p className="text-gray-400 text-xs">
+              <Icons.Empty className="w-6 h-6 text-gray-300 mb-2" />
+              <p className="text-gray-300 text-xs">
                 {searchQuery ? 'No matching ports found' : 'No listening ports detected'}
               </p>
             </div>
@@ -582,12 +595,12 @@ export function App() {
       {/* Footer status bar */}
       {state && (
         <footer
+          ref={footerRef}
           data-tauri-drag-region
-          onMouseDown={startDrag}
-          className="px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-500 bg-black select-none cursor-grab active:cursor-grabbing"
+          className="px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-400 bg-black select-none cursor-grab active:cursor-grabbing"
         >
           <span>{state.ports.length} port{state.ports.length !== 1 ? 's' : ''} active</span>
-          <span className="text-gray-500">Alt+P to toggle</span>
+          <span>Alt+P to toggle</span>
         </footer>
       )}
 
