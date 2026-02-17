@@ -14,6 +14,10 @@ interface PortListProps {
   onShowDetails?: (port: PortInfo) => void
 }
 
+// Stable references to avoid creating new objects every render (fixes #10)
+const EMPTY_SET = new Set<string>()
+const EMPTY_MAP = new Map<string, ChangeState>()
+
 function getChangeClass(change?: ChangeState): string {
   switch (change) {
     case 'new': return 'bg-accent-green/10 border-l-2 border-l-accent-green'
@@ -27,8 +31,8 @@ export function PortList({
   onKill,
   killingPort,
   selectedIndex = -1,
-  selectedPorts = new Set(),
-  portChanges = new Map(),
+  selectedPorts = EMPTY_SET,
+  portChanges = EMPTY_MAP,
   onPortClick,
   onContextMenu,
   onShowDetails,

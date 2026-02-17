@@ -107,7 +107,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
                     onClick={copyPort}
                     className="w-full px-3 py-2 flex items-center gap-2 text-gray-300 hover:bg-dark-600 text-sm"
                 >
-                    <Icons.Port className="w-4 h-4" />
+                    <Icons.Copy className="w-4 h-4" />
                     <span>Copy Port</span>
                 </button>
 
@@ -115,7 +115,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
                     onClick={copyPid}
                     className="w-full px-3 py-2 flex items-center gap-2 text-gray-300 hover:bg-dark-600 text-sm"
                 >
-                    <Icons.Process className="w-4 h-4" />
+                    <Icons.Copy className="w-4 h-4" />
                     <span>Copy PID</span>
                 </button>
 
@@ -124,7 +124,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
                         onClick={openFolder}
                         className="w-full px-3 py-2 flex items-center gap-2 text-gray-300 hover:bg-dark-600 text-sm"
                     >
-                        <Icons.Port className="w-4 h-4" />
+                        <Icons.Folder className="w-4 h-4" />
                         <span>Open Folder</span>
                     </button>
                 )}

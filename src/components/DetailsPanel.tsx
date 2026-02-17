@@ -1,5 +1,5 @@
 import type { JSX } from 'preact'
-import { useState, useEffect } from 'preact/hooks'
+import { useState, useEffect, useRef } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/tauri'
 import { shell } from '@tauri-apps/api'
 import type { PortInfo, ProcessDetails } from '../types'
@@ -11,9 +11,18 @@ interface DetailsPanelProps {
     onKill: (port: PortInfo) => void
 }
 
+// Fixed formatBytes: clamp index and add TB unit (fixes #15)
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return 'N/A'
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
+
 export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.Element {
     const [details, setDetails] = useState<ProcessDetails | null>(null)
     const [loading, setLoading] = useState(true)
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -34,7 +43,15 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                 setLoading(false)
             }
         }
+
         fetchDetails()
+
+        // Refresh process details every 3s for live memory/CPU (fixes #12)
+        intervalRef.current = setInterval(fetchDetails, 3000)
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current)
+        }
     }, [port.pid])
 
     const openFolder = async () => {
@@ -57,13 +74,6 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text)
-    }
-
-    const formatBytes = (bytes: number): string => {
-        if (bytes === 0) return 'N/A'
-        const units = ['B', 'KB', 'MB', 'GB']
-        const i = Math.floor(Math.log(bytes) / Math.log(1024))
-        return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
     }
 
     return (
@@ -104,7 +114,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                             className="text-gray-500 hover:text-white"
                                             title="Copy PID"
                                         >
-                                            <Icons.Port className="w-3 h-3" />
+                                            <Icons.Copy className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
@@ -154,7 +164,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                         onClick={openFolder}
                                         className="btn btn-ghost flex-1 flex items-center justify-center gap-2"
                                     >
-                                        <Icons.Port className="w-4 h-4" />
+                                        <Icons.Folder className="w-4 h-4" />
                                         <span>Open Folder</span>
                                     </button>
                                 )}
