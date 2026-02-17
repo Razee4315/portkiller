@@ -9,12 +9,13 @@ interface PortListProps {
   selectedIndex?: number
   selectedPorts?: Set<string>
   portChanges?: Map<string, ChangeState>
+  pendingKill?: string | null
   onPortClick?: (port: PortInfo, e: MouseEvent) => void
   onContextMenu?: (port: PortInfo, e: MouseEvent) => void
   onShowDetails?: (port: PortInfo) => void
 }
 
-// Stable references to avoid creating new objects every render (fixes #10)
+// Stable references to avoid creating new objects every render
 const EMPTY_SET = new Set<string>()
 const EMPTY_MAP = new Map<string, ChangeState>()
 
@@ -33,6 +34,7 @@ export function PortList({
   selectedIndex = -1,
   selectedPorts = EMPTY_SET,
   portChanges = EMPTY_MAP,
+  pendingKill = null,
   onPortClick,
   onContextMenu,
   onShowDetails,
@@ -45,6 +47,7 @@ export function PortList({
         const isProtected = portInfo.is_protected
         const isSelected = selectedIndex === index || selectedPorts.has(key)
         const changeState = portChanges.get(key)
+        const isPendingKill = pendingKill === key
 
         return (
           <div
@@ -57,7 +60,7 @@ export function PortList({
             onContextMenu={(e) => onContextMenu?.(portInfo, e as unknown as MouseEvent)}
             onDblClick={() => onShowDetails?.(portInfo)}
             className={`list-row group ${isProtected ? 'list-row-protected' : ''} ${isSelected ? 'list-row-selected' : ''
-              } ${getChangeClass(changeState)} cursor-pointer`}
+              } ${getChangeClass(changeState)} ${isPendingKill ? 'ring-1 ring-accent-red/50 bg-accent-red/5' : ''} cursor-pointer`}
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div
@@ -104,18 +107,24 @@ export function PortList({
                 <button
                   onClick={(e) => { e.stopPropagation(); onKill(portInfo) }}
                   disabled={isKilling}
-                  className={`btn btn-danger flex items-center gap-1 text-[11px] transition-all focus:outline-none focus:ring-2 focus:ring-accent-red/30 ${
-                    isKilling ? 'opacity-100 cursor-not-allowed' : 'opacity-30 group-hover:opacity-100 focus:opacity-100'
+                  className={`btn flex items-center gap-1 text-[11px] transition-all focus:outline-none focus:ring-2 focus:ring-accent-red/30 ${
+                    isPendingKill
+                      ? 'btn-danger opacity-100 animate-pulse'
+                      : isKilling
+                      ? 'btn-danger opacity-100 cursor-not-allowed'
+                      : 'btn-danger opacity-30 group-hover:opacity-100 focus:opacity-100'
                   }`}
-                  title={`Kill ${portInfo.process_name}`}
-                  aria-label={`Kill process ${portInfo.process_name} on port ${portInfo.port}`}
+                  title={isPendingKill ? 'Click again to confirm' : `Kill ${portInfo.process_name}`}
+                  aria-label={isPendingKill ? `Confirm kill ${portInfo.process_name}` : `Kill process ${portInfo.process_name} on port ${portInfo.port}`}
                 >
                   {isKilling ? (
                     <Icons.Spinner className="w-3 h-3 animate-spin" />
+                  ) : isPendingKill ? (
+                    <Icons.Warning className="w-3 h-3" />
                   ) : (
                     <Icons.Trash className="w-3 h-3" />
                   )}
-                  <span>Kill</span>
+                  <span>{isPendingKill ? 'Confirm?' : 'Kill'}</span>
                 </button>
               )}
             </div>
