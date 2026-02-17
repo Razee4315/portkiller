@@ -1,5 +1,5 @@
 import type { JSX } from 'preact'
-import { useState, useEffect } from 'preact/hooks'
+import { useState, useEffect, useRef } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/tauri'
 import { shell } from '@tauri-apps/api'
 import type { PortInfo, ProcessDetails } from '../types'
@@ -11,9 +11,19 @@ interface DetailsPanelProps {
     onKill: (port: PortInfo) => void
 }
 
+// Fixed formatBytes: clamp index and add TB unit (fixes #15)
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return 'N/A'
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
+
 export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.Element {
     const [details, setDetails] = useState<ProcessDetails | null>(null)
     const [loading, setLoading] = useState(true)
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const modalRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -34,8 +44,48 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                 setLoading(false)
             }
         }
+
         fetchDetails()
+
+        // Refresh process details every 3s for live memory/CPU (fixes #12)
+        intervalRef.current = setInterval(fetchDetails, 3000)
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current)
+        }
     }, [port.pid])
+
+    // Focus trap for modal accessibility (fixes UI-6)
+    useEffect(() => {
+        const modal = modalRef.current
+        if (!modal) return
+
+        const focusableSelector = 'button, [tabindex]:not([tabindex="-1"])'
+        const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
+
+        const handleTab = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return
+            const focusable = getFocusable()
+            if (focusable.length === 0) return
+
+            const first = focusable[0]
+            const last = focusable[focusable.length - 1]
+
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault()
+                last.focus()
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault()
+                first.focus()
+            }
+        }
+
+        document.addEventListener('keydown', handleTab)
+        const focusable = getFocusable()
+        if (focusable.length > 0) focusable[0].focus()
+
+        return () => document.removeEventListener('keydown', handleTab)
+    }, [loading])
 
     const openFolder = async () => {
         if (port.process_path) {
@@ -50,7 +100,6 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         try {
             await invoke('open_task_manager')
         } catch {
-            // Fallback: try shell
             await shell.open('taskmgr.exe')
         }
     }
@@ -59,29 +108,31 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         navigator.clipboard.writeText(text)
     }
 
-    const formatBytes = (bytes: number): string => {
-        if (bytes === 0) return 'N/A'
-        const units = ['B', 'KB', 'MB', 'GB']
-        const i = Math.floor(Math.log(bytes) / Math.log(1024))
-        return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
-    }
-
     return (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
+        <div
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Process details for port ${port.port}`}
+        >
+            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Process Details</span>
                     </div>
-                    <button onClick={onClose} className="text-gray-500 hover:text-white">
+                    <button
+                        onClick={onClose}
+                        className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
+                        aria-label="Close details"
+                    >
                         <Icons.Kill className="w-5 h-5" />
                     </button>
                 </div>
 
                 <div className="p-4 space-y-4 overflow-y-auto">
                     {loading ? (
-                        <div className="flex items-center justify-center py-8">
+                        <div className="flex items-center justify-center py-8" aria-label="Loading process details">
                             <Icons.Spinner className="w-6 h-6 text-gray-500 animate-spin" />
                         </div>
                     ) : (
@@ -101,10 +152,11 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                         <span className="text-white font-mono text-sm">{port.pid}</span>
                                         <button
                                             onClick={() => copyToClipboard(port.pid.toString())}
-                                            className="text-gray-500 hover:text-white"
+                                            className="text-gray-500 hover:text-white p-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
                                             title="Copy PID"
+                                            aria-label="Copy PID to clipboard"
                                         >
-                                            <Icons.Port className="w-3 h-3" />
+                                            <Icons.Copy className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
@@ -153,14 +205,16 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     <button
                                         onClick={openFolder}
                                         className="btn btn-ghost flex-1 flex items-center justify-center gap-2"
+                                        aria-label="Open containing folder"
                                     >
-                                        <Icons.Port className="w-4 h-4" />
+                                        <Icons.Folder className="w-4 h-4" />
                                         <span>Open Folder</span>
                                     </button>
                                 )}
                                 <button
                                     onClick={openTaskManager}
                                     className="btn btn-ghost flex-1 flex items-center justify-center gap-2"
+                                    aria-label="Open Task Manager"
                                 >
                                     <Icons.Process className="w-4 h-4" />
                                     <span>Task Manager</span>
@@ -171,6 +225,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                 <button
                                     onClick={() => { onKill(port); onClose() }}
                                     className="btn btn-danger w-full flex items-center justify-center gap-2"
+                                    aria-label={`Kill process ${port.process_name}`}
                                 >
                                     <Icons.Trash className="w-4 h-4" />
                                     <span>Kill Process</span>

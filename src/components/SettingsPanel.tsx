@@ -1,5 +1,5 @@
 import type { JSX } from 'preact'
-import { useState } from 'preact/hooks'
+import { useState, useEffect, useRef } from 'preact/hooks'
 import type { CommonPort } from '../types'
 import { COMMON_PORTS } from '../types'
 import { Icons } from './Icons'
@@ -16,6 +16,40 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
     )
     const [newPort, setNewPort] = useState('')
     const [newDesc, setNewDesc] = useState('')
+    const modalRef = useRef<HTMLDivElement>(null)
+
+    // Focus trap for modal accessibility (fixes UI-6)
+    useEffect(() => {
+        const modal = modalRef.current
+        if (!modal) return
+
+        const focusableSelector = 'button, input, [tabindex]:not([tabindex="-1"])'
+        const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
+
+        const handleTab = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return
+            const focusable = getFocusable()
+            if (focusable.length === 0) return
+
+            const first = focusable[0]
+            const last = focusable[focusable.length - 1]
+
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault()
+                last.focus()
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault()
+                first.focus()
+            }
+        }
+
+        document.addEventListener('keydown', handleTab)
+        // Focus first focusable element on open
+        const focusable = getFocusable()
+        if (focusable.length > 0) focusable[0].focus()
+
+        return () => document.removeEventListener('keydown', handleTab)
+    }, [])
 
     const addPort = () => {
         const portNum = parseInt(newPort, 10)
@@ -46,15 +80,31 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
         onSave(isDefault ? [] : ports)
     }
 
+    const handleAddKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && newPort) {
+            e.preventDefault()
+            addPort()
+        }
+    }
+
     return (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
-            <div className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
+        <div
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+        >
+            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold">Settings</span>
                     </div>
-                    <button onClick={onClose} className="text-gray-500 hover:text-white">
+                    <button
+                        onClick={onClose}
+                        className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
+                        aria-label="Close settings"
+                    >
                         <Icons.Kill className="w-5 h-5" />
                     </button>
                 </div>
@@ -65,7 +115,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                             <span className="text-gray-400 text-sm font-medium">Common Ports</span>
                             <button
                                 onClick={resetToDefault}
-                                className="text-xs text-gray-500 hover:text-white"
+                                className="text-xs text-gray-500 hover:text-white focus:outline-none focus:text-white"
                             >
                                 Reset to Default
                             </button>
@@ -81,7 +131,8 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                                     <span className="text-gray-400 text-sm flex-1 truncate">{port.description}</span>
                                     <button
                                         onClick={() => removePort(port.port)}
-                                        className="text-gray-400 hover:text-accent-red transition-colors"
+                                        className="text-gray-400 hover:text-accent-red transition-colors p-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-red/40"
+                                        aria-label={`Remove port ${port.port}`}
                                     >
                                         <Icons.Kill className="w-3.5 h-3.5" />
                                     </button>
@@ -98,16 +149,20 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                                 placeholder="Port"
                                 value={newPort}
                                 onInput={(e) => setNewPort((e.target as HTMLInputElement).value)}
+                                onKeyDown={handleAddKeyDown}
                                 className="input-field w-24 text-sm py-2"
                                 min="1"
                                 max="65535"
+                                aria-label="Port number"
                             />
                             <input
                                 type="text"
                                 placeholder="Description"
                                 value={newDesc}
                                 onInput={(e) => setNewDesc((e.target as HTMLInputElement).value)}
+                                onKeyDown={handleAddKeyDown}
                                 className="input-field flex-1 text-sm py-2"
+                                aria-label="Port description"
                             />
                             <button
                                 onClick={addPort}
@@ -129,7 +184,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                     </button>
                     <button
                         onClick={handleSave}
-                        className="btn btn-danger flex-1"
+                        className="btn btn-primary flex-1"
                     >
                         Save Changes
                     </button>
