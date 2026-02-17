@@ -20,12 +20,22 @@
   input[type="number"] {
     -moz-appearance: textfield;
   }
+
+  /* Respect reduced motion preference (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
   .port-card {
     @apply relative p-2.5 rounded-lg transition-all duration-200 cursor-pointer;
     @apply hover:scale-[1.02] active:scale-[0.98];
+    @apply focus:outline-none focus:ring-2 focus:ring-accent-blue/40 focus:ring-offset-1 focus:ring-offset-dark-900;
   }
 
   .port-card-free {
@@ -49,6 +59,11 @@
     @apply focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-900;
   }
 
+  .btn-primary {
+    @apply bg-accent-blue/15 text-accent-blue border border-accent-blue/25;
+    @apply hover:bg-accent-blue/25 hover:border-accent-blue/40 focus:ring-accent-blue/30;
+  }
+
   .btn-danger {
     @apply bg-accent-red/15 text-accent-red border border-accent-red/25;
     @apply hover:bg-accent-red/25 hover:border-accent-red/40 focus:ring-accent-red/30;
@@ -56,11 +71,12 @@
 
   .btn-ghost {
     @apply text-gray-300 hover:text-white hover:bg-dark-600;
+    @apply focus:ring-gray-500/30;
   }
 
   .toast {
-    @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg;
-    @apply text-xs font-medium shadow-lg z-50 cursor-pointer;
+    @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg;
+    @apply text-xs font-medium shadow-lg z-50;
     @apply animate-slide-up;
   }
 
@@ -75,6 +91,7 @@
   .list-row {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg;
     @apply hover:bg-dark-700 transition-all duration-150;
+    @apply focus-within:ring-1 focus-within:ring-accent-blue/30;
   }
 
   .list-row-protected {
@@ -101,6 +118,12 @@
   .modal-content {
     @apply bg-dark-900 border border-dark-500 rounded-xl;
     @apply shadow-2xl overflow-hidden;
+  }
+
+  /* Context menu item focus style for keyboard navigation */
+  .ctx-menu-item {
+    @apply w-full px-3 py-2 flex items-center gap-2 text-sm text-left;
+    @apply focus:outline-none focus:bg-dark-600;
   }
 }
 

@@ -11,7 +11,7 @@ interface PortGridProps {
 
 export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort }: PortGridProps): JSX.Element {
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto" role="grid" aria-label="Common ports">
       {commonPorts.map((cp) => {
         const portInfo = getPortStatus(cp.port)
         const isUsed = !!portInfo
@@ -23,6 +23,13 @@ export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort }: Po
             key={cp.port}
             onClick={() => portInfo && onKill(portInfo)}
             disabled={!isUsed || isKilling || isProtected}
+            aria-label={
+              isProtected
+                ? `Port ${cp.port}: protected, ${portInfo?.process_name}`
+                : isUsed
+                ? `Kill ${portInfo?.process_name} on port ${cp.port}`
+                : `Port ${cp.port}: free, ${cp.description}`
+            }
             className={`port-card group ${isUsed ? 'port-card-used' : 'port-card-free'} ${
               isProtected ? 'cursor-not-allowed' : ''
             } ${isKilling ? 'animate-pulse' : ''}`}

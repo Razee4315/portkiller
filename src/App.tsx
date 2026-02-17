@@ -526,22 +526,25 @@ export function App() {
           )}
           <button
             onClick={() => setShowSettings(true)}
-            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors"
+            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
             title="Settings"
+            aria-label="Open settings"
           >
             <Icons.Settings className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={async () => await appWindow.hide()}
-            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors"
+            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
             title="Minimize to tray"
+            aria-label="Minimize to tray"
           >
             <Icons.Minimize className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={async () => await appWindow.hide()}
-            className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-300 hover:text-accent-red transition-colors"
+            className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-300 hover:text-accent-red transition-colors focus:outline-none focus:ring-2 focus:ring-accent-red/40"
             title="Close"
+            aria-label="Close window"
           >
             <Icons.Kill className="w-3.5 h-3.5" />
           </button>
@@ -560,12 +563,17 @@ export function App() {
             onKeyDown={handleInputKeyDown}
             className="input-field pl-9"
             autoFocus
+            aria-label="Search ports and processes. Commands: admin, refresh, clear, settings, kill [port], export"
+            role="combobox"
+            aria-expanded="false"
+            aria-autocomplete="list"
           />
-          <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+          <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" aria-hidden="true" />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-white"
+              aria-label="Clear search"
             >
               <Icons.Kill className="w-3.5 h-3.5" />
             </button>
@@ -588,7 +596,7 @@ export function App() {
       </div>
 
       {/* Port list */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <main className="flex-1 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between">
           <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">
             {searchQuery ? 'Search Results' : 'All Listening Ports'}
@@ -645,7 +653,7 @@ export function App() {
             />
           )}
         </div>
-      </div>
+      </main>
 
       {/* Footer status bar */}
       {state && (
