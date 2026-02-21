@@ -530,31 +530,15 @@ export function App() {
     customPorts.length > 0 ? customPorts : COMMON_PORTS
   , [customPorts])
 
-  useEffect(() => {
-    const handleDrag = (e: Event) => {
-      if ((e.target as HTMLElement).closest('button, a, input, select, textarea')) return
-      e.preventDefault()
-      appWindow.startDragging()
-    }
-    const header = headerRef.current
-    const footer = footerRef.current
-    header?.addEventListener('mousedown', handleDrag)
-    footer?.addEventListener('mousedown', handleDrag)
-    return () => {
-      header?.removeEventListener('mousedown', handleDrag)
-      footer?.removeEventListener('mousedown', handleDrag)
-    }
-  }, [])
 
   return (
     <div className="h-full bg-dark-900 rounded-xl border border-dark-500 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
       {/* Draggable title bar with window controls */}
       <header
         ref={headerRef}
-        data-tauri-drag-region
-        className="flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
+        className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0 pointer-events-none">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <Icons.Logo className="w-5 h-5 text-white flex-shrink-0" />
           <span className="text-white font-medium text-[11px] tracking-widest uppercase">
             PortKiller
@@ -562,7 +546,7 @@ export function App() {
           {selectedPorts.size > 1 && (
             <button
               onClick={requestBulkKill}
-              className={`btn text-[10px] flex items-center gap-1 ml-2 py-1 pointer-events-auto ${
+              className={`btn text-[10px] flex items-center gap-1 ml-2 py-1 no-drag ${
                 pendingBulkKill ? 'btn-danger animate-pulse' : 'btn-danger'
               }`}
               aria-label={pendingBulkKill ? `Confirm killing ${selectedPorts.size} processes` : `Kill ${selectedPorts.size} processes`}
@@ -572,7 +556,7 @@ export function App() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-0.5 pointer-events-auto">
+        <div className="flex items-center gap-0.5 no-drag">
           {state?.is_admin ? (
             <span className="text-[10px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
               <Icons.ShieldCheck className="w-3 h-3" />
@@ -734,8 +718,7 @@ export function App() {
       {state && (
         <footer
           ref={footerRef}
-          data-tauri-drag-region
-          className="px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-400 bg-black select-none cursor-grab active:cursor-grabbing"
+          className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-400 bg-black select-none cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2">
             <span>{state.ports.length} port{state.ports.length !== 1 ? 's' : ''}</span>
