@@ -105,7 +105,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                         className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         aria-label="Close settings"
                     >
-                        <Icons.Kill className="w-5 h-5" />
+                        <Icons.Close className="w-5 h-5" />
                     </button>
                 </div>
 
@@ -134,7 +134,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                                         className="text-gray-400 hover:text-accent-red transition-colors p-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-red/40"
                                         aria-label={`Remove port ${port.port}`}
                                     >
-                                        <Icons.Kill className="w-3.5 h-3.5" />
+                                        <Icons.Close className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                             ))}

@@ -29,7 +29,7 @@ export function Toast({ message, type, onDismiss }: ToastProps): JSX.Element {
             className="ml-2 text-current opacity-60 hover:opacity-100 transition-opacity"
             aria-label="Dismiss notification"
           >
-            <Icons.Kill className="w-3 h-3" />
+            <Icons.Close className="w-3 h-3" />
           </button>
         )}
       </div>

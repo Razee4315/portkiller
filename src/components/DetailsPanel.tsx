@@ -126,7 +126,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                         className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         aria-label="Close details"
                     >
-                        <Icons.Kill className="w-5 h-5" />
+                        <Icons.Close className="w-5 h-5" />
                     </button>
                 </div>
 

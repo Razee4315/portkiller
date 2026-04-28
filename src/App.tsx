@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/tauri'
 import { appWindow } from '@tauri-apps/api/window'
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
 import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
+import type { Preferences } from './preferences'
+import { loadPreferences, savePreferences } from './preferences'
 import { Icons } from './components/Icons'
 import { PortGrid } from './components/PortGrid'
 import { PortList } from './components/PortList'
@@ -68,6 +70,7 @@ export function App() {
   const [detailsPort, setDetailsPort] = useState<PortInfo | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
   const [lastUpdatedText, setLastUpdatedText] = useState('...')
   // Kill confirmation state (H5 - Error Prevention)
@@ -159,28 +162,74 @@ export function App() {
     }
   }, [])
 
+  // Poll on the user's chosen interval. Pause polling while the window is
+  // hidden — wakes up + does an immediate refresh when shown again.
   useEffect(() => {
     fetchPorts()
-    const interval = setInterval(fetchPorts, 2000)
+    const intervalMs = preferences.pollIntervalMs
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    const start = () => {
+      if (intervalMs > 0 && !timer) {
+        timer = setInterval(fetchPorts, intervalMs)
+      }
+    }
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+
+    start()
+
+    let unlistenPromise: ReturnType<typeof appWindow.onFocusChanged> | null = null
+    appWindow.isVisible().then(visible => {
+      if (!visible) stop()
+    }).catch(() => {})
+
+    unlistenPromise = appWindow.onFocusChanged(({ payload: focused }) => {
+      if (focused) {
+        fetchPorts()
+        start()
+      } else if (!preferences.minimizeOnBlur) {
+        // If we're not hiding on blur, polling can keep running so the list is
+        // ready when the user comes back. We only pause when truly hidden via
+        // visibilitychange (handled below).
+      }
+    })
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop()
+      } else {
+        fetchPorts()
+        start()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
-      clearInterval(interval)
+      stop()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      unlistenPromise?.then(fn => fn()).catch(() => {})
       changeTimersRef.current.forEach(t => clearTimeout(t))
       changeTimersRef.current.clear()
     }
-  }, [fetchPorts])
+  }, [fetchPorts, preferences.pollIntervalMs, preferences.minimizeOnBlur])
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
-  // Hide on focus loss
+  // Optionally hide on focus loss. Off by default — was the single most-disliked
+  // behavior in the old build (window vanishing when you clicked outside).
   useEffect(() => {
+    if (!preferences.minimizeOnBlur) return
     let mounted = true
     const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
       if (!focused && mounted) {
         setContextMenu(null)
-        setDetailsPort(null)
-        setShowSettings(false)
         appWindow.hide()
       }
     })
@@ -188,6 +237,19 @@ export function App() {
       mounted = false
       unlisten.then(fn => fn())
     }
+  }, [preferences.minimizeOnBlur])
+
+  // Apply alwaysOnTop pref to the actual window.
+  useEffect(() => {
+    appWindow.setAlwaysOnTop(preferences.alwaysOnTop).catch(() => {})
+  }, [preferences.alwaysOnTop])
+
+  const updatePreferences = useCallback((next: Partial<Preferences>) => {
+    setPreferences(prev => {
+      const merged = { ...prev, ...next }
+      savePreferences(merged)
+      return merged
+    })
   }, [])
 
   const filteredPortsRef = useRef<PortInfo[]>([])
@@ -558,14 +620,14 @@ export function App() {
         </div>
         <div className="flex items-center gap-0.5 no-drag">
           {state?.is_admin ? (
-            <span className="text-[10px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
+            <span className="text-[11px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
               <Icons.ShieldCheck className="w-3 h-3" />
               Admin
             </span>
           ) : (
             <button
               onClick={handleRestartAsAdmin}
-              className="text-[10px] text-accent-yellow flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded hover:bg-accent-yellow/10 transition-colors"
+              className="text-[11px] text-accent-yellow flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded hover:bg-accent-yellow/10 transition-colors"
               title="Restart as Administrator for full control"
               aria-label="Restart as Administrator"
             >
@@ -573,6 +635,21 @@ export function App() {
               Admin
             </button>
           )}
+          <button
+            onClick={() => updatePreferences({ alwaysOnTop: !preferences.alwaysOnTop })}
+            className={`p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40 ${
+              preferences.alwaysOnTop
+                ? 'text-accent-blue bg-accent-blue/10 hover:bg-accent-blue/20'
+                : 'text-gray-300 hover:text-white hover:bg-dark-600'
+            }`}
+            title={preferences.alwaysOnTop ? 'Unpin window (currently always on top)' : 'Pin window on top'}
+            aria-label={preferences.alwaysOnTop ? 'Disable always on top' : 'Enable always on top'}
+            aria-pressed={preferences.alwaysOnTop}
+          >
+            {preferences.alwaysOnTop
+              ? <Icons.PinFilled className="w-3.5 h-3.5" />
+              : <Icons.Pin className="w-3.5 h-3.5" />}
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
@@ -584,18 +661,18 @@ export function App() {
           <button
             onClick={async () => await appWindow.hide()}
             className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
-            title="Minimize to tray"
-            aria-label="Minimize to tray"
+            title="Hide to tray (Alt+P to reopen)"
+            aria-label="Hide to tray"
           >
             <Icons.Minimize className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={async () => await appWindow.hide()}
+            onClick={async () => await appWindow.close()}
             className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-300 hover:text-accent-red transition-colors focus:outline-none focus:ring-2 focus:ring-accent-red/40"
-            title="Close"
-            aria-label="Close window"
+            title="Quit PortKiller"
+            aria-label="Quit application"
           >
-            <Icons.Kill className="w-3.5 h-3.5" />
+            <Icons.Close className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -624,7 +701,7 @@ export function App() {
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-white"
               aria-label="Clear search"
             >
-              <Icons.Kill className="w-3.5 h-3.5" />
+              <Icons.Close className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
