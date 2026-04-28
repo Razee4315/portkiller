@@ -102,8 +102,6 @@
         "minWidth": 460,
         "minHeight": 460,
         "resizable": true,
-        "maximizable": true,
-        "minimizable": true,
         "fullscreen": false,
         "focus": true
       }

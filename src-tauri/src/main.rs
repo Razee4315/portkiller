@@ -7,13 +7,24 @@ use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSock
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::os::windows::process::CommandExt;
+use std::sync::Mutex;
 use sysinfo::{Pid, System, ProcessRefreshKind, RefreshKind, ProcessesToUpdate};
 use tauri::{
-    CustomMenuItem, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
-    SystemTrayMenuItem, Window, AppHandle,
+    CustomMenuItem, GlobalShortcutManager, Manager, State, SystemTray, SystemTrayEvent,
+    SystemTrayMenu, SystemTrayMenuItem, Window, AppHandle,
 };
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
-use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+use windows::core::PCWSTR;
+use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE};
+use windows::Win32::System::Threading::{
+    CreateMutexW, OpenProcess, TerminateProcess, PROCESS_TERMINATE,
+};
+
+// Reusable sysinfo instance — creating a fresh System on every poll is the
+// single biggest CPU cost in the old code path.
+struct AppData {
+    system: Mutex<System>,
+    is_admin: bool,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PortInfo {
@@ -102,17 +113,19 @@ fn is_running_as_admin() -> bool {
 }
 
 #[tauri::command]
-fn get_listening_ports() -> Result<AppState, String> {
-    // Use targeted refresh for better performance
-    let mut system = System::new_with_specifics(
-        RefreshKind::new().with_processes(ProcessRefreshKind::everything())
-    );
-    system.refresh_processes(ProcessesToUpdate::All);
-
+fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
     let af_flags = AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6;
     let proto_flags = ProtocolFlags::TCP | ProtocolFlags::UDP;
 
     let sockets = get_sockets_info(af_flags, proto_flags).map_err(|e| e.to_string())?;
+
+    // Refresh process info on the shared System instance. Cheaper than
+    // building a new one per poll.
+    let mut system = data
+        .system
+        .lock()
+        .map_err(|_| "system mutex poisoned".to_string())?;
+    system.refresh_processes(ProcessesToUpdate::All);
 
     let mut ports: Vec<PortInfo> = Vec::new();
     let mut seen: HashSet<(u16, u32)> = HashSet::new();
@@ -162,19 +175,20 @@ fn get_listening_ports() -> Result<AppState, String> {
     Ok(AppState {
         ports,
         last_updated,
-        is_admin: is_running_as_admin(),
+        is_admin: data.is_admin,
     })
 }
 
 #[tauri::command]
-fn get_process_details(pid: u32) -> Result<ProcessDetails, String> {
-    let mut system = System::new_with_specifics(
-        RefreshKind::new().with_processes(ProcessRefreshKind::everything())
-    );
+fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails, String> {
+    let mut system = data
+        .system
+        .lock()
+        .map_err(|_| "system mutex poisoned".to_string())?;
     system.refresh_processes(ProcessesToUpdate::All);
 
     let sys_pid = Pid::from_u32(pid);
-    
+
     if let Some(process) = system.process(sys_pid) {
         let name = process.name().to_string_lossy().to_string();
         let path = process.exe()
@@ -358,10 +372,40 @@ fn create_tray_menu() -> SystemTrayMenu {
         .add_item(quit)
 }
 
+// Acquire a single-instance Windows mutex. Returns true if we're the first
+// instance, false if another PortKiller is already running.
+fn acquire_single_instance_lock() -> bool {
+    let name: Vec<u16> = "Global\\PortKiller_SingleInstance_v1\0"
+        .encode_utf16()
+        .collect();
+    unsafe {
+        let handle = CreateMutexW(None, true, PCWSTR(name.as_ptr()));
+        if handle.is_err() {
+            return true; // best-effort: don't block startup if mutex fails
+        }
+        GetLastError() != ERROR_ALREADY_EXISTS
+    }
+}
+
 fn main() {
+    if !acquire_single_instance_lock() {
+        // Another instance is already running. Bail out — Alt+P / tray click
+        // on the original instance is the way to bring it forward.
+        return;
+    }
+
+    let is_admin = is_running_as_admin();
+    let app_data = AppData {
+        system: Mutex::new(System::new_with_specifics(
+            RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+        )),
+        is_admin,
+    };
+
     let tray = SystemTray::new().with_menu(create_tray_menu());
 
     tauri::Builder::default()
+        .manage(app_data)
         .system_tray(tray)
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { .. } => {
