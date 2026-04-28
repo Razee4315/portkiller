@@ -7,21 +7,26 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // UI chrome: clean sans-serif. Mono is reserved for ports/PIDs/paths.
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Consolas', 'Monaco', 'monospace'],
       },
       colors: {
+        // Softer, slightly warm-neutral surfaces — easier on the eye than pure
+        // black, still feels like a developer tool.
         dark: {
-          900: '#0d0d0d',
-          800: '#141414',
-          700: '#1a1a1a',
-          600: '#222222',
-          500: '#2a2a2a',
+          900: '#0d0e11',
+          800: '#14161b',
+          700: '#1c1f25',
+          600: '#252932',
+          500: '#2f343f',
         },
         accent: {
           green: '#22c55e',
           red: '#ef4444',
-          blue: '#3b82f6',
+          blue: '#60a5fa',
           yellow: '#eab308',
+          amber: '#f59e0b',
         }
       },
       animation: {

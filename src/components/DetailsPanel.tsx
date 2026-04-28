@@ -116,10 +116,10 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
             aria-label={`Process details for port ${port.port}`}
         >
             <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
-                        <span className="text-white font-semibold">Process Details</span>
+                        <span className="text-white font-semibold text-sm">Process details</span>
                     </div>
                     <button
                         onClick={onClose}

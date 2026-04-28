@@ -598,11 +598,11 @@ export function App() {
       {/* Draggable title bar with window controls */}
       <header
         ref={headerRef}
-        className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
+        className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-dark-800 select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Icons.Logo className="w-5 h-5 text-white flex-shrink-0" />
-          <span className="text-white font-medium text-[11px] tracking-widest uppercase">
+          <span className="text-white font-semibold text-[13px]">
             PortKiller
           </span>
           {selectedPorts.size > 1 && (
@@ -683,7 +683,7 @@ export function App() {
           <input
             ref={inputRef}
             type="text"
-            placeholder='Search or command (type "help" for commands)...'
+            placeholder="Search a port or process — try “3000” or type help"
             value={searchQuery}
             onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
             onKeyDown={handleInputKeyDown}
@@ -727,25 +727,25 @@ export function App() {
       {/* Port list */}
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between">
-          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">
-            {searchQuery ? 'Search Results' : 'All Listening Ports'}
+          <span className="text-gray-300 text-[12px] font-medium">
+            {searchQuery ? 'Search results' : 'All listening ports'}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => handleExport('json')}
-              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors px-1.5 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
-              title="Copy as JSON"
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-2 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Copy listening ports to clipboard as JSON"
               aria-label="Export ports as JSON to clipboard"
             >
-              JSON
+              Copy JSON
             </button>
             <button
               onClick={() => handleExport('csv')}
-              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors px-1.5 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
-              title="Copy as CSV"
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-2 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Copy listening ports to clipboard as CSV"
               aria-label="Export ports as CSV to clipboard"
             >
-              CSV
+              Copy CSV
             </button>
           </div>
         </div>
@@ -797,16 +797,22 @@ export function App() {
       {state && (
         <footer
           ref={footerRef}
-          className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-400 bg-black select-none cursor-grab active:cursor-grabbing"
+          className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[11px] text-gray-400 bg-dark-900 select-none cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2">
             <span>{state.ports.length} port{state.ports.length !== 1 ? 's' : ''}</span>
-            <span className="text-gray-600">|</span>
+            <span className="text-gray-600">·</span>
             <span className="text-gray-500" title="Last refreshed">{lastUpdatedText}</span>
+            {preferences.pollIntervalMs === 0 && (
+              <>
+                <span className="text-gray-600">·</span>
+                <span className="text-accent-yellow" title="Auto-refresh disabled in settings">paused</span>
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600" title="Press / to search">/</span>
-            <span className="text-gray-600" title="Press Alt+P to toggle window">Alt+P</span>
+          <div className="flex items-center gap-2 no-drag">
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Focus search">/</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Toggle window">Alt+P</kbd>
           </div>
         </footer>
       )}

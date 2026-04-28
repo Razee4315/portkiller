@@ -105,10 +105,10 @@ export function SettingsPanel({
             aria-label="Settings"
         >
             <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
-                        <span className="text-white font-semibold">Settings</span>
+                        <span className="text-white font-semibold text-sm">Settings</span>
                     </div>
                     <button
                         onClick={onClose}
