@@ -110,8 +110,8 @@ export function SettingsPanel({
             aria-modal="true"
             aria-label="Settings"
         >
-            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
+            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold text-sm">Settings</span>
@@ -125,7 +125,7 @@ export function SettingsPanel({
                     </button>
                 </div>
 
-                <div className="p-4 space-y-5 overflow-y-auto max-h-[460px]">
+                <div className="flex-1 min-h-0 p-4 space-y-5 overflow-y-auto">
                     <section className="space-y-3">
                         <span className="text-gray-300 text-sm font-medium">Behavior</span>
 
@@ -271,7 +271,7 @@ export function SettingsPanel({
                     </section>
                 </div>
 
-                <div className="flex gap-2 p-4 border-t border-dark-500">
+                <div className="flex-shrink-0 flex gap-2 p-4 border-t border-dark-500 bg-dark-900">
                     <button
                         onClick={onClose}
                         className="btn btn-ghost flex-1"

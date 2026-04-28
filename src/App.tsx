@@ -668,9 +668,14 @@ export function App() {
 
   return (
     <div className="h-full bg-dark-900 rounded-xl border border-dark-500 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-      {/* Draggable title bar with window controls */}
+      {/* Draggable title bar with window controls.
+          data-tauri-drag-region is the v2-native way to mark a drag region;
+          children inherit the drag behavior unless they're interactive
+          (buttons, inputs). The `drag-region` CSS class keeps -webkit-app-region
+          working as a belt-and-suspenders fallback. */}
       <header
         ref={headerRef}
+        data-tauri-drag-region
         className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-dark-800 select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -870,6 +875,7 @@ export function App() {
       {state && (
         <footer
           ref={footerRef}
+          data-tauri-drag-region
           className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[11px] text-gray-400 bg-dark-900 select-none cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2">

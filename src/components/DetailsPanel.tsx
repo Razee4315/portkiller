@@ -131,8 +131,8 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
             aria-modal="true"
             aria-label={`Process details for port ${port.port}`}
         >
-            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
+            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold text-sm">Process details</span>
@@ -146,7 +146,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                     </button>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto">
+                <div className="flex-1 min-h-0 p-4 space-y-4 overflow-y-auto">
                     {loading ? (
                         <div className="flex items-center justify-center py-8" aria-label="Loading process details">
                             <Icons.Spinner className="w-6 h-6 text-gray-500 animate-spin" />
