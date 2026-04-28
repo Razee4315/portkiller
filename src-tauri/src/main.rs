@@ -8,13 +8,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::os::windows::process::CommandExt;
 use std::sync::Mutex;
-use sysinfo::{Pid, System, ProcessRefreshKind, RefreshKind, ProcessesToUpdate};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use tauri::{
-    CustomMenuItem, GlobalShortcutManager, Manager, State, SystemTray, SystemTrayEvent,
-    SystemTrayMenu, SystemTrayMenuItem, Window, AppHandle,
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, State, WebviewWindow,
 };
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE};
+use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
 use windows::Win32::System::Threading::{
     CreateMutexW, OpenProcess, TerminateProcess, PROCESS_TERMINATE,
 };
@@ -105,7 +107,7 @@ fn is_running_as_admin() -> bool {
         .args(["session"])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output();
-    
+
     match output {
         Ok(o) => o.status.success(),
         Err(_) => false,
@@ -191,14 +193,16 @@ fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails,
 
     if let Some(process) = system.process(sys_pid) {
         let name = process.name().to_string_lossy().to_string();
-        let path = process.exe()
+        let path = process
+            .exe()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
         let memory_bytes = process.memory();
         let cpu_percent = process.cpu_usage();
-        
+
         // Find child processes
-        let children: Vec<u32> = system.processes()
+        let children: Vec<u32> = system
+            .processes()
             .iter()
             .filter_map(|(child_pid, child_proc)| {
                 if child_proc.parent() == Some(sys_pid) {
@@ -225,12 +229,12 @@ fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails,
 #[tauri::command]
 fn open_task_manager() -> Result<(), String> {
     use std::process::Command;
-    
+
     Command::new("taskmgr.exe")
         .creation_flags(0x08000000)
         .spawn()
         .map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 
@@ -312,16 +316,17 @@ fn kill_process(pid: u32, port: u16, process_name: String) -> KillResult {
 
 #[tauri::command]
 fn restart_as_admin(app_handle: AppHandle) -> Result<(), String> {
-    use std::process::Command;
     use std::os::windows::process::CommandExt;
-    
+    use std::process::Command;
+
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    
+
     // Use ShellExecuteW via PowerShell to properly elevate
     let result = Command::new("powershell")
         .creation_flags(0x08000000) // CREATE_NO_WINDOW - hide PowerShell window
         .args([
-            "-WindowStyle", "Hidden",
+            "-WindowStyle",
+            "Hidden",
             "-Command",
             &format!(
                 "Start-Process -FilePath '{}' -Verb RunAs",
@@ -329,7 +334,7 @@ fn restart_as_admin(app_handle: AppHandle) -> Result<(), String> {
             ),
         ])
         .spawn();
-    
+
     match result {
         Ok(_) => {
             // Exit current instance after spawning elevated one
@@ -344,11 +349,11 @@ fn restart_as_admin(app_handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn hide_main_window(window: Window) {
+fn hide_main_window(window: WebviewWindow) {
     let _ = window.hide();
 }
 
-fn show_window(window: &Window) {
+fn show_window(window: &WebviewWindow) {
     // Don't re-center on every show — the frontend persists the user's last
     // position and we want to honor it. center=true in tauri.conf.json still
     // covers the very first launch.
@@ -356,7 +361,7 @@ fn show_window(window: &Window) {
     let _ = window.set_focus();
 }
 
-fn toggle_window(window: &Window) {
+fn toggle_window(window: &WebviewWindow) {
     if window.is_visible().unwrap_or(false) {
         let _ = window.hide();
     } else {
@@ -364,14 +369,16 @@ fn toggle_window(window: &Window) {
     }
 }
 
-fn create_tray_menu() -> SystemTrayMenu {
-    let show = CustomMenuItem::new("show".to_string(), "Show (Alt+P)");
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    
-    SystemTrayMenu::new()
-        .add_item(show)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit)
+fn handle_tray_show(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        show_window(&w);
+    }
+}
+
+fn handle_tray_toggle(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        toggle_window(&w);
+    }
 }
 
 // Acquire a single-instance Windows mutex. Returns true if we're the first
@@ -404,40 +411,56 @@ fn main() {
         is_admin,
     };
 
-    let tray = SystemTray::new().with_menu(create_tray_menu());
+    let alt_p = Shortcut::new(Some(Modifiers::ALT), Code::KeyP);
+    let alt_p_for_handler = alt_p.clone();
+    let alt_p_for_setup = alt_p.clone();
 
     tauri::Builder::default()
         .manage(app_data)
-        .system_tray(tray)
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick { .. } => {
-                if let Some(window) = app.get_window("main") {
-                    toggle_window(&window);
-                }
-            }
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "show" => {
-                    if let Some(window) = app.get_window("main") {
-                        show_window(&window);
+        .plugin(tauri_plugin_shell::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(move |app, shortcut, event| {
+                    if shortcut == &alt_p_for_handler && event.state == ShortcutState::Pressed {
+                        handle_tray_toggle(app);
                     }
-                }
-                "quit" => {
-                    app.exit(0);
-                }
-                _ => {}
-            },
-            _ => {}
-        })
-        .setup(|app| {
-            let window = app.get_window("main").unwrap();
-            let window_clone = window.clone();
-
-            // Register global hotkey Alt+P
-            app.global_shortcut_manager()
-                .register("Alt+P", move || {
-                    toggle_window(&window_clone);
                 })
-                .expect("Failed to register global shortcut");
+                .build(),
+        )
+        .setup(move |app| {
+            // Register Alt+P globally
+            app.global_shortcut().register(alt_p_for_setup.clone())?;
+
+            // Build tray menu
+            let show_item = MenuItem::with_id(app, "show", "Show (Alt+P)", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            // Tray icon — reuse the default window icon embedded by tauri-build.
+            let icon = app
+                .default_window_icon()
+                .ok_or("missing default window icon")?
+                .clone();
+            TrayIconBuilder::new()
+                .icon(icon)
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => handle_tray_show(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        handle_tray_toggle(tray.app_handle());
+                    }
+                })
+                .build(app)?;
 
             Ok(())
         })

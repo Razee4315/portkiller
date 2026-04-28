@@ -52,9 +52,9 @@ export function ShortcutsPanel({ onClose }: ShortcutsPanelProps): JSX.Element {
         ref={ref}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="modal-content w-[440px] max-h-[80%] overflow-hidden focus:outline-none"
+        className="modal-content w-[440px] max-h-[90vh] flex flex-col overflow-hidden focus:outline-none"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
           <div className="flex items-center gap-2">
             <Icons.Keyboard className="w-5 h-5 text-accent-blue" />
             <span className="text-white font-semibold text-sm">Keyboard shortcuts</span>
@@ -68,7 +68,7 @@ export function ShortcutsPanel({ onClose }: ShortcutsPanelProps): JSX.Element {
           </button>
         </div>
 
-        <div className="p-4 space-y-5 overflow-y-auto max-h-[480px]">
+        <div className="flex-1 min-h-0 p-4 space-y-5 overflow-y-auto">
           <section>
             <span className="text-gray-300 text-xs font-medium block mb-2">Keys</span>
             <ul className="space-y-1.5">
