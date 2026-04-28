@@ -8,11 +8,13 @@ repository = ""
 edition = "2021"
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }
 winres = "0.1"
 
 [dependencies]
-tauri = { version = "1.8", features = ["global-shortcut-all", "shell-open", "system-tray", "window-close", "window-hide", "window-show", "window-center", "window-set-focus"] }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-global-shortcut = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
