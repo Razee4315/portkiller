@@ -1,90 +1,18 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PortKiller",
+  "version": "1.0.0",
+  "identifier": "com.portkiller.app",
   "build": {
-    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist"
+    "beforeBuildCommand": "npm run build"
   },
-  "package": {
-    "productName": "PortKiller",
-    "version": "1.0.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "globalShortcut": {
-        "all": true
-      },
-      "window": {
-        "all": false,
-        "close": true,
-        "hide": true,
-        "show": true,
-        "center": true,
-        "setFocus": true,
-        "setAlwaysOnTop": true,
-        "setSize": true,
-        "setPosition": true,
-        "startDragging": true
-      },
-      "shell": {
-        "open": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
-      "deb": {
-        "depends": []
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.ico"
-      ],
-      "identifier": "com.portkiller.app",
-      "longDescription": "The fastest way for developers to visualize and terminate processes locking specific ports",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": [],
-      "shortDescription": "Port Process Killer Utility",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": "",
-        "wix": null,
-        "nsis": {
-          "installerIcon": "icons/icon.ico",
-          "headerImage": null,
-          "sidebarImage": null,
-          "license": null,
-          "installMode": "currentUser",
-          "languages": ["English"]
-        },
-        "webviewInstallMode": {
-          "type": "embedBootstrapper"
-        },
-        "wix": {
-          "language": "en-US"
-        }
-      }
-    },
+  "app": {
+    "withGlobalTauri": false,
     "security": {
       "csp": null
-    },
-    "systemTray": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
     },
     "windows": [
       {
@@ -102,9 +30,61 @@
         "minWidth": 460,
         "minHeight": 460,
         "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
         "fullscreen": false,
         "focus": true
       }
     ]
+  },
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "shortDescription": "Port Process Killer Utility",
+    "longDescription": "The fastest way for developers to visualize and terminate processes locking specific ports",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "targets": "all",
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": null,
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": null,
+        "sidebarImage": null,
+        "license": null,
+        "installMode": "currentUser",
+        "languages": ["English"]
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
   }
 }
