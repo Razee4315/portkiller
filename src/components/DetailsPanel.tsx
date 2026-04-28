@@ -104,6 +104,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         }
     }
 
+    const openInBrowser = async () => {
+        const scheme = port.port === 443 ? 'https' : 'http'
+        try { await shell.open(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
+    }
+
+    const isHttpish = port.protocol.toUpperCase() === 'TCP'
+
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text)
     }
@@ -199,6 +206,17 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     </span>
                                 </div>
                             </div>
+
+                            {isHttpish && (
+                                <button
+                                    onClick={openInBrowser}
+                                    className="btn btn-ghost w-full flex items-center justify-center gap-2 border border-dark-500"
+                                    aria-label={`Open localhost:${port.port} in your browser`}
+                                >
+                                    <Icons.ExternalLink className="w-4 h-4" />
+                                    <span>Open localhost:{port.port}</span>
+                                </button>
+                            )}
 
                             <div className="flex gap-2 pt-2 border-t border-dark-500">
                                 {port.process_path && (
