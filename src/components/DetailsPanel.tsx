@@ -1,7 +1,7 @@
 import type { JSX } from 'preact'
 import { useState, useEffect, useRef } from 'preact/hooks'
-import { invoke } from '@tauri-apps/api/tauri'
-import { shell } from '@tauri-apps/api'
+import { invoke } from '@tauri-apps/api/core'
+import { open as openShell } from '@tauri-apps/plugin-shell'
 import type { PortInfo, ProcessDetails } from '../types'
 import { Icons } from './Icons'
 
@@ -100,7 +100,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         if (port.process_path) {
             try {
                 const folder = port.process_path.substring(0, port.process_path.lastIndexOf('\\'))
-                await shell.open(folder)
+                await openShell(folder)
             } catch { }
         }
     }
@@ -109,13 +109,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         try {
             await invoke('open_task_manager')
         } catch {
-            await shell.open('taskmgr.exe')
+            await openShell('taskmgr.exe')
         }
     }
 
     const openInBrowser = async () => {
         const scheme = port.port === 443 ? 'https' : 'http'
-        try { await shell.open(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
+        try { await openShell(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
     }
 
     const isHttpish = port.protocol.toUpperCase() === 'TCP'

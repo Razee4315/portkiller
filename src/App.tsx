@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
-import { invoke } from '@tauri-apps/api/tauri'
-import { appWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
+
+// In v2 there's no global `appWindow` singleton — each component grabs the
+// current window via getCurrentWindow(). One module-level call keeps things
+// drop-in compatible with the v1 code below.
+const appWindow = getCurrentWindow()
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
 import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
 import type { Preferences } from './preferences'

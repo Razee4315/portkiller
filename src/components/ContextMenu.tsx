@@ -1,6 +1,6 @@
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { shell } from '@tauri-apps/api'
+import { open as openShell } from '@tauri-apps/plugin-shell'
 import type { PortInfo } from '../types'
 import { Icons } from './Icons'
 
@@ -42,7 +42,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
         menuItems.push({
             label: `Open ${url}`,
             action: async () => {
-                try { await shell.open(url) } catch { /* noop */ }
+                try { await openShell(url) } catch { /* noop */ }
                 onClose()
             },
             icon: <Icons.ExternalLink className="w-4 h-4" />,
@@ -67,7 +67,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
             label: 'Open Folder',
             action: async () => {
                 const folder = port.process_path.substring(0, port.process_path.lastIndexOf('\\'))
-                await shell.open(folder)
+                await openShell(folder)
                 onClose()
             },
             icon: <Icons.Folder className="w-4 h-4" />,
@@ -76,7 +76,7 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
 
     menuItems.push({
         label: 'Task Manager',
-        action: async () => { await shell.open('taskmgr.exe'); onClose() },
+        action: async () => { await openShell('taskmgr.exe'); onClose() },
         icon: <Icons.Process className="w-4 h-4" />,
     })
 
