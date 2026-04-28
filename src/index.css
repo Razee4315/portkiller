@@ -4,12 +4,16 @@
 
 @layer base {
   body {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     -webkit-user-select: none;
   }
+
+  /* Numeric data (ports, PIDs, paths) keeps the mono treatment so columns
+     align and digits don't shift. Apply with `font-mono` from Tailwind. */
 
   /* Hide number input spinner arrows */
   input[type="number"]::-webkit-inner-spin-button,
@@ -49,13 +53,13 @@
 
   .input-field {
     @apply w-full bg-dark-800 border border-dark-500 rounded-lg px-4 py-2.5;
-    @apply text-white text-sm placeholder-gray-400 font-mono;
-    @apply focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/25;
+    @apply text-white text-[13px] placeholder-gray-500;
+    @apply focus:outline-none focus:border-accent-blue/60 focus:ring-1 focus:ring-accent-blue/30;
     @apply transition-all duration-200;
   }
 
   .btn {
-    @apply px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-200;
+    @apply px-3 py-1.5 rounded-md font-medium text-[12px] transition-all duration-200;
     @apply focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-900;
   }
 

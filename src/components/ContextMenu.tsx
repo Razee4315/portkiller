@@ -35,6 +35,20 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
         })
     }
 
+    // Any TCP port may be reachable via http://localhost — let the user decide.
+    if (port.protocol.toUpperCase() === 'TCP') {
+        const scheme = port.port === 443 ? 'https' : 'http'
+        const url = `${scheme}://localhost:${port.port}`
+        menuItems.push({
+            label: `Open ${url}`,
+            action: async () => {
+                try { await shell.open(url) } catch { /* noop */ }
+                onClose()
+            },
+            icon: <Icons.ExternalLink className="w-4 h-4" />,
+        })
+    }
+
     menuItems.push(
         {
             label: 'Copy Port',
@@ -121,8 +135,8 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
     }, [focusedIndex])
 
     // Adjust position to stay within viewport
-    const adjustedX = Math.min(x, window.innerWidth - 200)
-    const adjustedY = Math.min(y, window.innerHeight - 280)
+    const adjustedX = Math.min(x, window.innerWidth - 240)
+    const adjustedY = Math.min(y, window.innerHeight - 300)
 
     return (
         <div className="fixed inset-0 z-50" aria-label="Context menu">
@@ -130,11 +144,11 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
                 ref={ref}
                 role="menu"
                 aria-label={`Actions for port ${port.port}`}
-                className="absolute bg-dark-800 border border-dark-500 rounded-lg shadow-2xl py-1 w-48 animate-fade-in"
+                className="absolute bg-dark-800 border border-dark-500 rounded-lg shadow-2xl py-1 w-56 animate-fade-in"
                 style={{ left: adjustedX, top: adjustedY }}
             >
                 <div className="px-3 py-2 border-b border-dark-600">
-                    <p className="text-white text-sm font-semibold truncate">:{port.port}</p>
+                    <p className="text-white text-sm font-semibold font-mono truncate">:{port.port}</p>
                     <p className="text-gray-500 text-xs truncate">{port.process_name}</p>
                 </div>
 
@@ -148,8 +162,8 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
                             index === focusedIndex ? 'bg-dark-600' : 'hover:bg-dark-600'
                         }`}
                     >
-                        {item.icon}
-                        <span>{item.label}</span>
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        <span className="truncate">{item.label}</span>
                     </button>
                 ))}
             </div>

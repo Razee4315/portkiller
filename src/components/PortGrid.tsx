@@ -54,7 +54,7 @@ export function PortGrid({ commonPorts, getPortStatus, onKill, killingPort, pend
                 ) : (
                   <Icons.DotFree className="w-1.5 h-1.5 text-accent-green/40" />
                 )}
-                <span className={`text-xs font-semibold ${isUsed ? 'text-white' : 'text-gray-300'}`}>
+                <span className={`text-xs font-mono font-semibold ${isUsed ? 'text-white' : 'text-gray-300'}`}>
                   {cp.label}
                 </span>
               </div>

@@ -2,15 +2,25 @@ import type { JSX } from 'preact'
 import { useState, useEffect, useRef } from 'preact/hooks'
 import type { CommonPort } from '../types'
 import { COMMON_PORTS } from '../types'
+import type { Preferences } from '../preferences'
+import { POLL_OPTIONS } from '../preferences'
 import { Icons } from './Icons'
 
 interface SettingsPanelProps {
     customPorts: CommonPort[]
+    preferences: Preferences
+    onUpdatePreferences: (next: Partial<Preferences>) => void
     onSave: (ports: CommonPort[]) => void
     onClose: () => void
 }
 
-export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelProps): JSX.Element {
+export function SettingsPanel({
+    customPorts,
+    preferences,
+    onUpdatePreferences,
+    onSave,
+    onClose,
+}: SettingsPanelProps): JSX.Element {
     const [ports, setPorts] = useState<CommonPort[]>(
         customPorts.length > 0 ? customPorts : [...COMMON_PORTS]
     )
@@ -18,12 +28,14 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
     const [newDesc, setNewDesc] = useState('')
     const modalRef = useRef<HTMLDivElement>(null)
 
-    // Focus trap for modal accessibility (fixes UI-6)
+    // Focus trap + return focus to the trigger when closed.
     useEffect(() => {
         const modal = modalRef.current
         if (!modal) return
 
-        const focusableSelector = 'button, input, [tabindex]:not([tabindex="-1"])'
+        const previouslyFocused = document.activeElement as HTMLElement | null
+
+        const focusableSelector = 'button, input, select, [tabindex]:not([tabindex="-1"])'
         const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
 
         const handleTab = (e: KeyboardEvent) => {
@@ -44,11 +56,15 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
         }
 
         document.addEventListener('keydown', handleTab)
-        // Focus first focusable element on open
         const focusable = getFocusable()
         if (focusable.length > 0) focusable[0].focus()
 
-        return () => document.removeEventListener('keydown', handleTab)
+        return () => {
+            document.removeEventListener('keydown', handleTab)
+            if (previouslyFocused && document.body.contains(previouslyFocused)) {
+                previouslyFocused.focus()
+            }
+        }
     }, [])
 
     const addPort = () => {
@@ -95,33 +111,113 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
             aria-label="Settings"
         >
             <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[420px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Settings className="w-5 h-5 text-accent-blue" />
-                        <span className="text-white font-semibold">Settings</span>
+                        <span className="text-white font-semibold text-sm">Settings</span>
                     </div>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         aria-label="Close settings"
                     >
-                        <Icons.Kill className="w-5 h-5" />
+                        <Icons.Close className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto max-h-[400px]">
-                    <div>
+                <div className="p-4 space-y-5 overflow-y-auto max-h-[460px]">
+                    <section className="space-y-3">
+                        <span className="text-gray-300 text-sm font-medium">Behavior</span>
+
+                        <label className="flex items-start gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={preferences.alwaysOnTop}
+                                onChange={(e) =>
+                                    onUpdatePreferences({ alwaysOnTop: (e.target as HTMLInputElement).checked })
+                                }
+                                className="mt-0.5 accent-accent-blue"
+                                aria-describedby="pref-aot-desc"
+                            />
+                            <div className="flex-1">
+                                <div className="text-white text-sm">Always on top</div>
+                                <div id="pref-aot-desc" className="text-gray-400 text-xs">
+                                    Keep the window above other apps. Toggle anytime with the pin icon in the title bar.
+                                </div>
+                            </div>
+                        </label>
+
+                        <label className="flex items-start gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={preferences.minimizeOnBlur}
+                                onChange={(e) =>
+                                    onUpdatePreferences({ minimizeOnBlur: (e.target as HTMLInputElement).checked })
+                                }
+                                className="mt-0.5 accent-accent-blue"
+                                aria-describedby="pref-blur-desc"
+                            />
+                            <div className="flex-1">
+                                <div className="text-white text-sm">Hide when window loses focus</div>
+                                <div id="pref-blur-desc" className="text-gray-400 text-xs">
+                                    Auto-hide to tray as soon as you click another app. Off by default.
+                                </div>
+                            </div>
+                        </label>
+
+                        <label className="flex items-start gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={preferences.showCommonPorts}
+                                onChange={(e) =>
+                                    onUpdatePreferences({ showCommonPorts: (e.target as HTMLInputElement).checked })
+                                }
+                                className="mt-0.5 accent-accent-blue"
+                            />
+                            <div className="flex-1">
+                                <div className="text-white text-sm">Show common ports grid</div>
+                                <div className="text-gray-400 text-xs">
+                                    Hide the dev-port shortcuts at the top of the window.
+                                </div>
+                            </div>
+                        </label>
+
+                        <div>
+                            <label htmlFor="poll-interval" className="text-white text-sm block mb-1">
+                                Refresh rate
+                            </label>
+                            <select
+                                id="poll-interval"
+                                value={preferences.pollIntervalMs}
+                                onChange={(e) =>
+                                    onUpdatePreferences({
+                                        pollIntervalMs: parseInt((e.target as HTMLSelectElement).value, 10),
+                                    })
+                                }
+                                className="input-field py-1.5 text-sm"
+                            >
+                                {POLL_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                            <p className="text-gray-400 text-xs mt-1">
+                                How often the port list is refreshed. Polling pauses while the window is hidden.
+                            </p>
+                        </div>
+                    </section>
+
+                    <section>
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-gray-400 text-sm font-medium">Common Ports</span>
+                            <span className="text-gray-300 text-sm font-medium">Common Ports</span>
                             <button
                                 onClick={resetToDefault}
-                                className="text-xs text-gray-500 hover:text-white focus:outline-none focus:text-white"
+                                className="text-xs text-gray-400 hover:text-white focus:outline-none focus:text-white"
                             >
                                 Reset to Default
                             </button>
                         </div>
 
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                        <div className="space-y-1 max-h-44 overflow-y-auto">
                             {ports.map((port) => (
                                 <div
                                     key={port.port}
@@ -134,15 +230,15 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                                         className="text-gray-400 hover:text-accent-red transition-colors p-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-red/40"
                                         aria-label={`Remove port ${port.port}`}
                                     >
-                                        <Icons.Kill className="w-3.5 h-3.5" />
+                                        <Icons.Close className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="border-t border-dark-500 pt-4">
-                        <span className="text-gray-400 text-sm font-medium block mb-2">Add New Port</span>
+                    <section className="border-t border-dark-500 pt-4">
+                        <span className="text-gray-300 text-sm font-medium block mb-2">Add New Port</span>
                         <div className="flex gap-2">
                             <input
                                 type="number"
@@ -172,7 +268,7 @@ export function SettingsPanel({ customPorts, onSave, onClose }: SettingsPanelPro
                                 Add
                             </button>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
                 <div className="flex gap-2 p-4 border-t border-dark-500">

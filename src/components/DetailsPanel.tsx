@@ -55,10 +55,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         }
     }, [port.pid])
 
-    // Focus trap for modal accessibility (fixes UI-6)
+    // Focus trap for modal accessibility, plus return focus to the previously
+    // focused element when the modal closes.
     useEffect(() => {
         const modal = modalRef.current
         if (!modal) return
+
+        const previouslyFocused = document.activeElement as HTMLElement | null
 
         const focusableSelector = 'button, [tabindex]:not([tabindex="-1"])'
         const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
@@ -84,7 +87,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         const focusable = getFocusable()
         if (focusable.length > 0) focusable[0].focus()
 
-        return () => document.removeEventListener('keydown', handleTab)
+        return () => {
+            document.removeEventListener('keydown', handleTab)
+            // Best-effort focus restore — the trigger may have unmounted.
+            if (previouslyFocused && document.body.contains(previouslyFocused)) {
+                previouslyFocused.focus()
+            }
+        }
     }, [loading])
 
     const openFolder = async () => {
@@ -104,6 +113,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         }
     }
 
+    const openInBrowser = async () => {
+        const scheme = port.port === 443 ? 'https' : 'http'
+        try { await shell.open(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
+    }
+
+    const isHttpish = port.protocol.toUpperCase() === 'TCP'
+
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text)
     }
@@ -116,17 +132,17 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
             aria-label={`Process details for port ${port.port}`}
         >
             <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-black">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
-                        <span className="text-white font-semibold">Process Details</span>
+                        <span className="text-white font-semibold text-sm">Process details</span>
                     </div>
                     <button
                         onClick={onClose}
                         className="text-gray-500 hover:text-white p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         aria-label="Close details"
                     >
-                        <Icons.Kill className="w-5 h-5" />
+                        <Icons.Close className="w-5 h-5" />
                     </button>
                 </div>
 
@@ -199,6 +215,17 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     </span>
                                 </div>
                             </div>
+
+                            {isHttpish && (
+                                <button
+                                    onClick={openInBrowser}
+                                    className="btn btn-ghost w-full flex items-center justify-center gap-2 border border-dark-500"
+                                    aria-label={`Open localhost:${port.port} in your browser`}
+                                >
+                                    <Icons.ExternalLink className="w-4 h-4" />
+                                    <span>Open localhost:{port.port}</span>
+                                </button>
+                            )}
 
                             <div className="flex gap-2 pt-2 border-t border-dark-500">
                                 {port.process_path && (

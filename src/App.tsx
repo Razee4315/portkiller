@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/tauri'
-import { appWindow } from '@tauri-apps/api/window'
+import { appWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
 import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
+import type { Preferences } from './preferences'
+import {
+  loadPreferences,
+  savePreferences,
+  loadWindowState,
+  saveWindowState,
+} from './preferences'
 import { Icons } from './components/Icons'
 import { PortGrid } from './components/PortGrid'
 import { PortList } from './components/PortList'
@@ -10,6 +17,7 @@ import { Toast } from './components/Toast'
 import { DetailsPanel } from './components/DetailsPanel'
 import { ContextMenu } from './components/ContextMenu'
 import { SettingsPanel } from './components/SettingsPanel'
+import { ShortcutsPanel } from './components/ShortcutsPanel'
 
 // Fuzzy search scoring
 function fuzzyScore(query: string, target: string): number {
@@ -65,9 +73,11 @@ export function App() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [selectedPorts, setSelectedPorts] = useState<Set<string>>(new Set())
   const [showSettings, setShowSettings] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [detailsPort, setDetailsPort] = useState<PortInfo | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
   const [lastUpdatedText, setLastUpdatedText] = useState('...')
   // Kill confirmation state (H5 - Error Prevention)
@@ -159,28 +169,74 @@ export function App() {
     }
   }, [])
 
+  // Poll on the user's chosen interval. Pause polling while the window is
+  // hidden — wakes up + does an immediate refresh when shown again.
   useEffect(() => {
     fetchPorts()
-    const interval = setInterval(fetchPorts, 2000)
+    const intervalMs = preferences.pollIntervalMs
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    const start = () => {
+      if (intervalMs > 0 && !timer) {
+        timer = setInterval(fetchPorts, intervalMs)
+      }
+    }
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+
+    start()
+
+    let unlistenPromise: ReturnType<typeof appWindow.onFocusChanged> | null = null
+    appWindow.isVisible().then(visible => {
+      if (!visible) stop()
+    }).catch(() => {})
+
+    unlistenPromise = appWindow.onFocusChanged(({ payload: focused }) => {
+      if (focused) {
+        fetchPorts()
+        start()
+      } else if (!preferences.minimizeOnBlur) {
+        // If we're not hiding on blur, polling can keep running so the list is
+        // ready when the user comes back. We only pause when truly hidden via
+        // visibilitychange (handled below).
+      }
+    })
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop()
+      } else {
+        fetchPorts()
+        start()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
-      clearInterval(interval)
+      stop()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      unlistenPromise?.then(fn => fn()).catch(() => {})
       changeTimersRef.current.forEach(t => clearTimeout(t))
       changeTimersRef.current.clear()
     }
-  }, [fetchPorts])
+  }, [fetchPorts, preferences.pollIntervalMs, preferences.minimizeOnBlur])
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
-  // Hide on focus loss
+  // Optionally hide on focus loss. Off by default — was the single most-disliked
+  // behavior in the old build (window vanishing when you clicked outside).
   useEffect(() => {
+    if (!preferences.minimizeOnBlur) return
     let mounted = true
     const unlisten = appWindow.onFocusChanged(({ payload: focused }) => {
       if (!focused && mounted) {
         setContextMenu(null)
-        setDetailsPort(null)
-        setShowSettings(false)
         appWindow.hide()
       }
     })
@@ -188,6 +244,63 @@ export function App() {
       mounted = false
       unlisten.then(fn => fn())
     }
+  }, [preferences.minimizeOnBlur])
+
+  // Apply alwaysOnTop pref to the actual window.
+  useEffect(() => {
+    appWindow.setAlwaysOnTop(preferences.alwaysOnTop).catch(() => {})
+  }, [preferences.alwaysOnTop])
+
+  // Window position + size memory. Restore once on mount, persist after each
+  // resize / move (debounced via the events themselves — Tauri only fires
+  // when the user releases).
+  useEffect(() => {
+    let cancelled = false
+    const saved = loadWindowState()
+    if (saved) {
+      ;(async () => {
+        try {
+          await appWindow.setSize(new LogicalSize(saved.width, saved.height))
+          await appWindow.setPosition(new LogicalPosition(saved.x, saved.y))
+        } catch {
+          // Saved geometry invalid (monitor unplugged etc.) — ignore.
+        }
+      })()
+    }
+
+    const persist = async () => {
+      if (cancelled) return
+      try {
+        const size = await appWindow.outerSize()
+        const pos = await appWindow.outerPosition()
+        const factor = await appWindow.scaleFactor()
+        saveWindowState({
+          width: size.width / factor,
+          height: size.height / factor,
+          x: pos.x / factor,
+          y: pos.y / factor,
+        })
+      } catch {
+        // ignore
+      }
+    }
+
+    const unResize = appWindow.onResized(() => { persist() })
+    const unMove = appWindow.onMoved(() => { persist() })
+
+    return () => {
+      cancelled = true
+      unResize.then(fn => fn()).catch(() => {})
+      unMove.then(fn => fn()).catch(() => {})
+    }
+  }, [])
+
+  const updatePreferences = useCallback((next: Partial<Preferences>) => {
+    setPreferences(prev => {
+      const merged = { ...prev, ...next }
+      savePreferences(merged)
+      return merged
+    })
   }, [])
 
   const filteredPortsRef = useRef<PortInfo[]>([])
@@ -229,6 +342,10 @@ export function App() {
           setContextMenu(null)
           return
         }
+        if (showShortcuts) {
+          setShowShortcuts(false)
+          return
+        }
         if (detailsPort) {
           setDetailsPort(null)
           return
@@ -245,6 +362,14 @@ export function App() {
       if (e.key === '/' && document.activeElement !== inputRef.current) {
         e.preventDefault()
         inputRef.current?.focus()
+        return
+      }
+
+      // Open the keyboard cheatsheet with `?` (Shift+/), but only when the
+      // search bar isn't focused so users can still type "?" in commands.
+      if (e.key === '?' && document.activeElement !== inputRef.current) {
+        e.preventDefault()
+        setShowShortcuts(s => !s)
         return
       }
 
@@ -283,7 +408,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, pendingKill, pendingBulkKill])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -351,7 +476,8 @@ export function App() {
       }
     } finally {
       setKillingPort(null)
-      setSearchQuery('')
+      // Don't clobber the user's search filter on kill — they may want to
+      // immediately re-check the same port or related ones.
     }
   }, [fetchPorts, showToast, state?.is_admin])
 
@@ -501,6 +627,10 @@ export function App() {
   const handlePortClick = useCallback((port: PortInfo, e: MouseEvent) => {
     const key = `${port.port}-${port.pid}`
 
+    // Any change to the multi-select set disarms a pending bulk-kill so users
+    // can't accidentally confirm killing a different group than they armed.
+    if (pendingBulkKill) setPendingBulkKill(false)
+
     if (e.ctrlKey || e.metaKey) {
       setSelectedPorts(prev => {
         const next = new Set(prev)
@@ -519,7 +649,7 @@ export function App() {
       setSelectedPorts(new Set([key]))
       setSelectedIndex(filteredPortsRef.current.findIndex(p => `${p.port}-${p.pid}` === key))
     }
-  }, [selectedIndex])
+  }, [selectedIndex, pendingBulkKill])
 
   const handleContextMenu = useCallback((port: PortInfo, e: MouseEvent) => {
     e.preventDefault()
@@ -536,11 +666,11 @@ export function App() {
       {/* Draggable title bar with window controls */}
       <header
         ref={headerRef}
-        className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-black select-none cursor-grab active:cursor-grabbing"
+        className="drag-region flex items-center justify-between px-3 py-2 border-b border-dark-500 bg-dark-800 select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Icons.Logo className="w-5 h-5 text-white flex-shrink-0" />
-          <span className="text-white font-medium text-[11px] tracking-widest uppercase">
+          <span className="text-white font-semibold text-[13px]">
             PortKiller
           </span>
           {selectedPorts.size > 1 && (
@@ -558,14 +688,14 @@ export function App() {
         </div>
         <div className="flex items-center gap-0.5 no-drag">
           {state?.is_admin ? (
-            <span className="text-[10px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
+            <span className="text-[11px] text-accent-green flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded bg-accent-green/10">
               <Icons.ShieldCheck className="w-3 h-3" />
               Admin
             </span>
           ) : (
             <button
               onClick={handleRestartAsAdmin}
-              className="text-[10px] text-accent-yellow flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded hover:bg-accent-yellow/10 transition-colors"
+              className="text-[11px] text-accent-yellow flex items-center gap-1 mr-1.5 px-1.5 py-0.5 rounded hover:bg-accent-yellow/10 transition-colors"
               title="Restart as Administrator for full control"
               aria-label="Restart as Administrator"
             >
@@ -573,6 +703,21 @@ export function App() {
               Admin
             </button>
           )}
+          <button
+            onClick={() => updatePreferences({ alwaysOnTop: !preferences.alwaysOnTop })}
+            className={`p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40 ${
+              preferences.alwaysOnTop
+                ? 'text-accent-blue bg-accent-blue/10 hover:bg-accent-blue/20'
+                : 'text-gray-300 hover:text-white hover:bg-dark-600'
+            }`}
+            title={preferences.alwaysOnTop ? 'Unpin window (currently always on top)' : 'Pin window on top'}
+            aria-label={preferences.alwaysOnTop ? 'Disable always on top' : 'Enable always on top'}
+            aria-pressed={preferences.alwaysOnTop}
+          >
+            {preferences.alwaysOnTop
+              ? <Icons.PinFilled className="w-3.5 h-3.5" />
+              : <Icons.Pin className="w-3.5 h-3.5" />}
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
@@ -584,18 +729,18 @@ export function App() {
           <button
             onClick={async () => await appWindow.hide()}
             className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
-            title="Minimize to tray"
-            aria-label="Minimize to tray"
+            title="Hide to tray (Alt+P to reopen)"
+            aria-label="Hide to tray"
           >
             <Icons.Minimize className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={async () => await appWindow.hide()}
+            onClick={async () => await appWindow.close()}
             className="p-1.5 rounded-md hover:bg-accent-red/20 text-gray-300 hover:text-accent-red transition-colors focus:outline-none focus:ring-2 focus:ring-accent-red/40"
-            title="Close"
-            aria-label="Close window"
+            title="Quit PortKiller"
+            aria-label="Quit application"
           >
-            <Icons.Kill className="w-3.5 h-3.5" />
+            <Icons.Close className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -606,7 +751,7 @@ export function App() {
           <input
             ref={inputRef}
             type="text"
-            placeholder='Search or command (type "help" for commands)...'
+            placeholder="Search a port or process — try “3000” or type help"
             value={searchQuery}
             onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
             onKeyDown={handleInputKeyDown}
@@ -624,49 +769,51 @@ export function App() {
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-white"
               aria-label="Clear search"
             >
-              <Icons.Kill className="w-3.5 h-3.5" />
+              <Icons.Close className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </nav>
 
-      {/* Common ports grid */}
-      <section className="px-3 py-3 border-b border-dark-500" aria-label="Common ports">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">Common Ports</span>
-          <span className="text-gray-400 text-[10px]">{state?.ports.length || 0} listening</span>
-        </div>
-        <PortGrid
-          commonPorts={allPorts}
-          getPortStatus={getCommonPortStatus}
-          onKill={requestKill}
-          killingPort={killingPort}
-          pendingKill={pendingKill}
-        />
-      </section>
+      {/* Common ports grid (toggleable in settings) */}
+      {preferences.showCommonPorts && (
+        <section className="px-3 py-3 border-b border-dark-500" aria-label="Common ports">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-gray-300 text-[11px] font-medium">Common ports</span>
+            <span className="text-gray-400 text-[11px]">{state?.ports.length || 0} listening</span>
+          </div>
+          <PortGrid
+            commonPorts={allPorts}
+            getPortStatus={getCommonPortStatus}
+            onKill={requestKill}
+            killingPort={killingPort}
+            pendingKill={pendingKill}
+          />
+        </section>
+      )}
 
       {/* Port list */}
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between">
-          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">
-            {searchQuery ? 'Search Results' : 'All Listening Ports'}
+          <span className="text-gray-300 text-[12px] font-medium">
+            {searchQuery ? 'Search results' : 'All listening ports'}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => handleExport('json')}
-              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors px-1.5 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
-              title="Copy as JSON"
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-2 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Copy listening ports to clipboard as JSON"
               aria-label="Export ports as JSON to clipboard"
             >
-              JSON
+              Copy JSON
             </button>
             <button
               onClick={() => handleExport('csv')}
-              className="text-gray-400 hover:text-white text-[10px] uppercase tracking-wider transition-colors px-1.5 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
-              title="Copy as CSV"
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-2 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Copy listening ports to clipboard as CSV"
               aria-label="Export ports as CSV to clipboard"
             >
-              CSV
+              Copy CSV
             </button>
           </div>
         </div>
@@ -718,16 +865,30 @@ export function App() {
       {state && (
         <footer
           ref={footerRef}
-          className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[10px] text-gray-400 bg-black select-none cursor-grab active:cursor-grabbing"
+          className="drag-region px-3 py-1.5 border-t border-dark-500 flex items-center justify-between text-[11px] text-gray-400 bg-dark-900 select-none cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2">
             <span>{state.ports.length} port{state.ports.length !== 1 ? 's' : ''}</span>
-            <span className="text-gray-600">|</span>
+            <span className="text-gray-600">·</span>
             <span className="text-gray-500" title="Last refreshed">{lastUpdatedText}</span>
+            {preferences.pollIntervalMs === 0 && (
+              <>
+                <span className="text-gray-600">·</span>
+                <span className="text-accent-yellow" title="Auto-refresh disabled in settings">paused</span>
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600" title="Press / to search">/</span>
-            <span className="text-gray-600" title="Press Alt+P to toggle window">Alt+P</span>
+          <div className="flex items-center gap-1 no-drag">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300 hover:text-white hover:border-dark-500 transition-colors focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Show keyboard shortcuts (press ?)"
+              aria-label="Show keyboard shortcuts"
+            >
+              ?
+            </button>
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Focus search">/</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Toggle window from anywhere">Alt+P</kbd>
           </div>
         </footer>
       )}
@@ -756,6 +917,8 @@ export function App() {
       {showSettings && (
         <SettingsPanel
           customPorts={customPorts}
+          preferences={preferences}
+          onUpdatePreferences={updatePreferences}
           onSave={(ports) => {
             setCustomPorts(ports)
             saveCustomPorts(ports)
@@ -763,6 +926,10 @@ export function App() {
           }}
           onClose={() => setShowSettings(false)}
         />
+      )}
+
+      {showShortcuts && (
+        <ShortcutsPanel onClose={() => setShowShortcuts(false)} />
       )}
     </div>
   )

@@ -21,7 +21,11 @@
         "hide": true,
         "show": true,
         "center": true,
-        "setFocus": true
+        "setFocus": true,
+        "setAlwaysOnTop": true,
+        "setSize": true,
+        "setPosition": true,
+        "startDragging": true
       },
       "shell": {
         "open": true
@@ -89,13 +93,15 @@
         "url": "index.html",
         "transparent": true,
         "decorations": false,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "visible": false,
-        "skipTaskbar": true,
+        "skipTaskbar": false,
         "center": true,
-        "width": 520,
-        "height": 620,
-        "resizable": false,
+        "width": 580,
+        "height": 680,
+        "minWidth": 460,
+        "minHeight": 460,
+        "resizable": true,
         "fullscreen": false,
         "focus": true
       }

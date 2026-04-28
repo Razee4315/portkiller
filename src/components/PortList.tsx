@@ -72,17 +72,17 @@ export function PortList({
 
               <div className="flex flex-col min-w-0 flex-1 gap-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-white font-semibold text-xs">:{portInfo.port}</span>
-                  <span className="text-gray-400 text-[10px] px-1.5 py-px bg-dark-600 rounded">
+                  <span className="text-white font-semibold font-mono text-[13px]">:{portInfo.port}</span>
+                  <span className="text-gray-400 text-[10px] px-1.5 py-px bg-dark-600 rounded font-mono">
                     {portInfo.protocol}
                   </span>
                   {changeState === 'new' && (
-                    <span className="text-accent-green text-[10px] font-medium">NEW</span>
+                    <span className="text-accent-green text-[10px] font-medium">New</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-300 truncate">
+                <div className="flex items-center gap-2 text-[12px] text-gray-300 truncate">
                   <span className="truncate">{portInfo.process_name}</span>
-                  <span className="text-gray-400">PID {portInfo.pid}</span>
+                  <span className="text-gray-400 font-mono text-[11px]">PID {portInfo.pid}</span>
                 </div>
               </div>
             </div>
