@@ -5,6 +5,9 @@ node_modules/
 dist/
 src-tauri/target/
 
+# Tauri v2 build-time generated files (capability schemas, ACL manifests)
+src-tauri/gen/
+
 # IDE
 .vscode/
 .idea/

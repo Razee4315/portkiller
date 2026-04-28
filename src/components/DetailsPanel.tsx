@@ -1,7 +1,7 @@
 import type { JSX } from 'preact'
 import { useState, useEffect, useRef } from 'preact/hooks'
-import { invoke } from '@tauri-apps/api/tauri'
-import { shell } from '@tauri-apps/api'
+import { invoke } from '@tauri-apps/api/core'
+import { open as openShell } from '@tauri-apps/plugin-shell'
 import type { PortInfo, ProcessDetails } from '../types'
 import { Icons } from './Icons'
 
@@ -100,7 +100,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         if (port.process_path) {
             try {
                 const folder = port.process_path.substring(0, port.process_path.lastIndexOf('\\'))
-                await shell.open(folder)
+                await openShell(folder)
             } catch { }
         }
     }
@@ -109,13 +109,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         try {
             await invoke('open_task_manager')
         } catch {
-            await shell.open('taskmgr.exe')
+            await openShell('taskmgr.exe')
         }
     }
 
     const openInBrowser = async () => {
         const scheme = port.port === 443 ? 'https' : 'http'
-        try { await shell.open(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
+        try { await openShell(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
     }
 
     const isHttpish = port.protocol.toUpperCase() === 'TCP'
@@ -131,8 +131,8 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
             aria-modal="true"
             aria-label={`Process details for port ${port.port}`}
         >
-            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[80%] overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
+            <div ref={modalRef} className="bg-dark-900 border border-dark-500 rounded-xl w-[400px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-500 bg-dark-800">
                     <div className="flex items-center gap-2">
                         <Icons.Process className="w-5 h-5 text-accent-blue" />
                         <span className="text-white font-semibold text-sm">Process details</span>
@@ -146,7 +146,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                     </button>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto">
+                <div className="flex-1 min-h-0 p-4 space-y-4 overflow-y-auto">
                     {loading ? (
                         <div className="flex items-center justify-center py-8" aria-label="Loading process details">
                             <Icons.Spinner className="w-6 h-6 text-gray-500 animate-spin" />

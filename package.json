@@ -11,12 +11,14 @@
     "build:release": "npm run build && npm run tauri build -- --bundles none && node scripts/embed-icon.cjs && npm run tauri build -- --bundles nsis,msi --ci"
   },
   "dependencies": {
-    "@tauri-apps/api": "^1.6.0",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.0.0",
     "preact": "^10.24.3"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.3",
-    "@tauri-apps/cli": "^1.6.3",
+    "@tauri-apps/cli": "^2.0.0",
     "autoprefixer": "^10.4.20",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
