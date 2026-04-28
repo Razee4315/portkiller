@@ -349,8 +349,10 @@ fn hide_main_window(window: Window) {
 }
 
 fn show_window(window: &Window) {
+    // Don't re-center on every show — the frontend persists the user's last
+    // position and we want to honor it. center=true in tauri.conf.json still
+    // covers the very first launch.
     let _ = window.show();
-    let _ = window.center();
     let _ = window.set_focus();
 }
 

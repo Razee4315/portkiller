@@ -55,10 +55,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         }
     }, [port.pid])
 
-    // Focus trap for modal accessibility (fixes UI-6)
+    // Focus trap for modal accessibility, plus return focus to the previously
+    // focused element when the modal closes.
     useEffect(() => {
         const modal = modalRef.current
         if (!modal) return
+
+        const previouslyFocused = document.activeElement as HTMLElement | null
 
         const focusableSelector = 'button, [tabindex]:not([tabindex="-1"])'
         const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
@@ -84,7 +87,13 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         const focusable = getFocusable()
         if (focusable.length > 0) focusable[0].focus()
 
-        return () => document.removeEventListener('keydown', handleTab)
+        return () => {
+            document.removeEventListener('keydown', handleTab)
+            // Best-effort focus restore — the trigger may have unmounted.
+            if (previouslyFocused && document.body.contains(previouslyFocused)) {
+                previouslyFocused.focus()
+            }
+        }
     }, [loading])
 
     const openFolder = async () => {

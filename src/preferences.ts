@@ -43,3 +43,37 @@ export function savePreferences(prefs: Preferences): void {
     // localStorage full or unavailable — ignore.
   }
 }
+
+// Window position + size memory. Stored separately so it can be wiped
+// independently if a user moves to a smaller display.
+export interface WindowState {
+  width: number
+  height: number
+  x: number
+  y: number
+}
+
+const WINDOW_STATE_KEY = 'portkiller_window_state_v1'
+
+export function loadWindowState(): WindowState | null {
+  try {
+    const raw = localStorage.getItem(WINDOW_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WindowState
+    if (
+      typeof parsed.width !== 'number' || typeof parsed.height !== 'number' ||
+      typeof parsed.x !== 'number' || typeof parsed.y !== 'number'
+    ) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function saveWindowState(state: WindowState): void {
+  try {
+    localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(state))
+  } catch {
+    // ignore
+  }
+}

@@ -28,12 +28,14 @@ export function SettingsPanel({
     const [newDesc, setNewDesc] = useState('')
     const modalRef = useRef<HTMLDivElement>(null)
 
-    // Focus trap for modal accessibility (fixes UI-6)
+    // Focus trap + return focus to the trigger when closed.
     useEffect(() => {
         const modal = modalRef.current
         if (!modal) return
 
-        const focusableSelector = 'button, input, [tabindex]:not([tabindex="-1"])'
+        const previouslyFocused = document.activeElement as HTMLElement | null
+
+        const focusableSelector = 'button, input, select, [tabindex]:not([tabindex="-1"])'
         const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
 
         const handleTab = (e: KeyboardEvent) => {
@@ -54,11 +56,15 @@ export function SettingsPanel({
         }
 
         document.addEventListener('keydown', handleTab)
-        // Focus first focusable element on open
         const focusable = getFocusable()
         if (focusable.length > 0) focusable[0].focus()
 
-        return () => document.removeEventListener('keydown', handleTab)
+        return () => {
+            document.removeEventListener('keydown', handleTab)
+            if (previouslyFocused && document.body.contains(previouslyFocused)) {
+                previouslyFocused.focus()
+            }
+        }
     }, [])
 
     const addPort = () => {

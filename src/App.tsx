@@ -1,10 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/tauri'
-import { appWindow } from '@tauri-apps/api/window'
+import { appWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
 import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
 import type { Preferences } from './preferences'
-import { loadPreferences, savePreferences } from './preferences'
+import {
+  loadPreferences,
+  savePreferences,
+  loadWindowState,
+  saveWindowState,
+} from './preferences'
 import { Icons } from './components/Icons'
 import { PortGrid } from './components/PortGrid'
 import { PortList } from './components/PortList'
@@ -12,6 +17,7 @@ import { Toast } from './components/Toast'
 import { DetailsPanel } from './components/DetailsPanel'
 import { ContextMenu } from './components/ContextMenu'
 import { SettingsPanel } from './components/SettingsPanel'
+import { ShortcutsPanel } from './components/ShortcutsPanel'
 
 // Fuzzy search scoring
 function fuzzyScore(query: string, target: string): number {
@@ -67,6 +73,7 @@ export function App() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [selectedPorts, setSelectedPorts] = useState<Set<string>>(new Set())
   const [showSettings, setShowSettings] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [detailsPort, setDetailsPort] = useState<PortInfo | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
@@ -244,6 +251,50 @@ export function App() {
     appWindow.setAlwaysOnTop(preferences.alwaysOnTop).catch(() => {})
   }, [preferences.alwaysOnTop])
 
+  // Window position + size memory. Restore once on mount, persist after each
+  // resize / move (debounced via the events themselves — Tauri only fires
+  // when the user releases).
+  useEffect(() => {
+    let cancelled = false
+    const saved = loadWindowState()
+    if (saved) {
+      ;(async () => {
+        try {
+          await appWindow.setSize(new LogicalSize(saved.width, saved.height))
+          await appWindow.setPosition(new LogicalPosition(saved.x, saved.y))
+        } catch {
+          // Saved geometry invalid (monitor unplugged etc.) — ignore.
+        }
+      })()
+    }
+
+    const persist = async () => {
+      if (cancelled) return
+      try {
+        const size = await appWindow.outerSize()
+        const pos = await appWindow.outerPosition()
+        const factor = await appWindow.scaleFactor()
+        saveWindowState({
+          width: size.width / factor,
+          height: size.height / factor,
+          x: pos.x / factor,
+          y: pos.y / factor,
+        })
+      } catch {
+        // ignore
+      }
+    }
+
+    const unResize = appWindow.onResized(() => { persist() })
+    const unMove = appWindow.onMoved(() => { persist() })
+
+    return () => {
+      cancelled = true
+      unResize.then(fn => fn()).catch(() => {})
+      unMove.then(fn => fn()).catch(() => {})
+    }
+  }, [])
+
   const updatePreferences = useCallback((next: Partial<Preferences>) => {
     setPreferences(prev => {
       const merged = { ...prev, ...next }
@@ -291,6 +342,10 @@ export function App() {
           setContextMenu(null)
           return
         }
+        if (showShortcuts) {
+          setShowShortcuts(false)
+          return
+        }
         if (detailsPort) {
           setDetailsPort(null)
           return
@@ -307,6 +362,14 @@ export function App() {
       if (e.key === '/' && document.activeElement !== inputRef.current) {
         e.preventDefault()
         inputRef.current?.focus()
+        return
+      }
+
+      // Open the keyboard cheatsheet with `?` (Shift+/), but only when the
+      // search bar isn't focused so users can still type "?" in commands.
+      if (e.key === '?' && document.activeElement !== inputRef.current) {
+        e.preventDefault()
+        setShowShortcuts(s => !s)
         return
       }
 
@@ -345,7 +408,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, pendingKill, pendingBulkKill])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -413,7 +476,8 @@ export function App() {
       }
     } finally {
       setKillingPort(null)
-      setSearchQuery('')
+      // Don't clobber the user's search filter on kill — they may want to
+      // immediately re-check the same port or related ones.
     }
   }, [fetchPorts, showToast, state?.is_admin])
 
@@ -563,6 +627,10 @@ export function App() {
   const handlePortClick = useCallback((port: PortInfo, e: MouseEvent) => {
     const key = `${port.port}-${port.pid}`
 
+    // Any change to the multi-select set disarms a pending bulk-kill so users
+    // can't accidentally confirm killing a different group than they armed.
+    if (pendingBulkKill) setPendingBulkKill(false)
+
     if (e.ctrlKey || e.metaKey) {
       setSelectedPorts(prev => {
         const next = new Set(prev)
@@ -581,7 +649,7 @@ export function App() {
       setSelectedPorts(new Set([key]))
       setSelectedIndex(filteredPortsRef.current.findIndex(p => `${p.port}-${p.pid}` === key))
     }
-  }, [selectedIndex])
+  }, [selectedIndex, pendingBulkKill])
 
   const handleContextMenu = useCallback((port: PortInfo, e: MouseEvent) => {
     e.preventDefault()
@@ -810,9 +878,17 @@ export function App() {
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 no-drag">
+          <div className="flex items-center gap-1 no-drag">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300 hover:text-white hover:border-dark-500 transition-colors focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Show keyboard shortcuts (press ?)"
+              aria-label="Show keyboard shortcuts"
+            >
+              ?
+            </button>
             <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Focus search">/</kbd>
-            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Toggle window">Alt+P</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Toggle window from anywhere">Alt+P</kbd>
           </div>
         </footer>
       )}
@@ -850,6 +926,10 @@ export function App() {
           }}
           onClose={() => setShowSettings(false)}
         />
+      )}
+
+      {showShortcuts && (
+        <ShortcutsPanel onClose={() => setShowShortcuts(false)} />
       )}
     </div>
   )
