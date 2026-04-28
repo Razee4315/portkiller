@@ -707,20 +707,22 @@ export function App() {
         </div>
       </nav>
 
-      {/* Common ports grid */}
-      <section className="px-3 py-3 border-b border-dark-500" aria-label="Common ports">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-gray-300 text-[10px] font-medium uppercase tracking-widest">Common Ports</span>
-          <span className="text-gray-400 text-[10px]">{state?.ports.length || 0} listening</span>
-        </div>
-        <PortGrid
-          commonPorts={allPorts}
-          getPortStatus={getCommonPortStatus}
-          onKill={requestKill}
-          killingPort={killingPort}
-          pendingKill={pendingKill}
-        />
-      </section>
+      {/* Common ports grid (toggleable in settings) */}
+      {preferences.showCommonPorts && (
+        <section className="px-3 py-3 border-b border-dark-500" aria-label="Common ports">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-gray-300 text-[11px] font-medium">Common ports</span>
+            <span className="text-gray-400 text-[11px]">{state?.ports.length || 0} listening</span>
+          </div>
+          <PortGrid
+            commonPorts={allPorts}
+            getPortStatus={getCommonPortStatus}
+            onKill={requestKill}
+            killingPort={killingPort}
+            pendingKill={pendingKill}
+          />
+        </section>
+      )}
 
       {/* Port list */}
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -833,6 +835,8 @@ export function App() {
       {showSettings && (
         <SettingsPanel
           customPorts={customPorts}
+          preferences={preferences}
+          onUpdatePreferences={updatePreferences}
           onSave={(ports) => {
             setCustomPorts(ports)
             saveCustomPorts(ports)
