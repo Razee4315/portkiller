@@ -40,16 +40,17 @@ jobs:
         shell: bash
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          # Update tauri.conf.json
-          jq --arg v "$VERSION" '.package.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          # Keep Tauri v2 config, Rust package metadata, and npm metadata aligned.
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
           # Update Cargo.toml
           sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          npm version "$VERSION" --no-git-tag-version
           echo "Updated version to $VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Rust
