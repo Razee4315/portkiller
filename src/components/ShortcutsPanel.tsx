@@ -13,6 +13,7 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['Enter'], label: 'Kill selected port (twice to confirm)' },
   { keys: ['Delete'], label: 'Kill selected port' },
   { keys: ['p'], label: 'Pin / unpin selected port' },
+  { keys: ['h'], label: 'Show recently killed processes' },
   { keys: ['Ctrl', 'C'], label: 'Copy selected port:pid' },
   { keys: ['Esc'], label: 'Close menu / cancel pending kill / hide window' },
   { keys: ['Ctrl', 'A'], label: 'Select all visible ports' },

@@ -91,3 +91,35 @@ export function savePinnedPorts(ports: number[]): void {
     else localStorage.setItem(PINNED_PORTS_KEY, JSON.stringify(ports));
   } catch { }
 }
+
+// Recently killed processes — capped ring buffer kept in localStorage. Used
+// for the in-app kill history panel. Keep this lean: no sensitive data.
+export interface KillRecord {
+  port: number;
+  pid: number;
+  processName: string;
+  timestamp: number;
+}
+
+const KILL_HISTORY_KEY = 'portkiller_kill_history_v1';
+const KILL_HISTORY_MAX = 15;
+
+export function loadKillHistory(): KillRecord[] {
+  try {
+    const raw = localStorage.getItem(KILL_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.slice(0, KILL_HISTORY_MAX);
+  } catch { }
+  return [];
+}
+
+export function appendKillHistory(record: KillRecord, current: KillRecord[]): KillRecord[] {
+  const next = [record, ...current].slice(0, KILL_HISTORY_MAX);
+  try { localStorage.setItem(KILL_HISTORY_KEY, JSON.stringify(next)); } catch { }
+  return next;
+}
+
+export function clearKillHistory(): void {
+  try { localStorage.removeItem(KILL_HISTORY_KEY); } catch { }
+}

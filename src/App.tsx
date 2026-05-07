@@ -7,7 +7,17 @@ import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/
 // drop-in compatible with the v1 code below.
 const appWindow = getCurrentWindow()
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
-import { COMMON_PORTS, loadCustomPorts, saveCustomPorts, loadPinnedPorts, savePinnedPorts } from './types'
+import {
+  COMMON_PORTS,
+  loadCustomPorts,
+  saveCustomPorts,
+  loadPinnedPorts,
+  savePinnedPorts,
+  loadKillHistory,
+  appendKillHistory,
+  clearKillHistory,
+} from './types'
+import type { KillRecord } from './types'
 import type { Preferences } from './preferences'
 import {
   loadPreferences,
@@ -24,6 +34,7 @@ import { DetailsPanel } from './components/DetailsPanel'
 import { ContextMenu } from './components/ContextMenu'
 import { SettingsPanel } from './components/SettingsPanel'
 import { ShortcutsPanel } from './components/ShortcutsPanel'
+import { HistoryPanel } from './components/HistoryPanel'
 
 // Fuzzy search scoring
 function fuzzyScore(query: string, target: string): number {
@@ -96,6 +107,8 @@ export function App() {
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [pinnedPorts, setPinnedPorts] = useState<Set<number>>(() => new Set(loadPinnedPorts()))
+  const [killHistory, setKillHistory] = useState<KillRecord[]>(() => loadKillHistory())
+  const [showHistory, setShowHistory] = useState(false)
   const protocolFilter = preferences.protocolFilter
   const sortMode = preferences.sortMode
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
@@ -428,6 +441,10 @@ export function App() {
           setShowShortcuts(false)
           return
         }
+        if (showHistory) {
+          setShowHistory(false)
+          return
+        }
         if (detailsPort) {
           setDetailsPort(null)
           return
@@ -487,6 +504,13 @@ export function App() {
         return
       }
 
+      // h — open the kill-history panel from anywhere outside the search box
+      if (e.key === 'h' && !isInputFocused && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        setShowHistory(s => !s)
+        return
+      }
+
       // Ctrl+C with a port selected (and search not focused) — copy "port:pid"
       if (e.ctrlKey && e.key === 'c' && !isInputFocused && selectedIndex >= 0) {
         const port = ports[selectedIndex]
@@ -521,7 +545,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -565,6 +589,12 @@ export function App() {
 
       if (result.success) {
         showToast(result.message, 'success')
+        setKillHistory(prev => appendKillHistory({
+          port: portInfo.port,
+          pid: portInfo.pid,
+          processName: portInfo.process_name,
+          timestamp: Date.now(),
+        }, prev))
         setTimeout(fetchPorts, 500)
       } else {
         showToast(formatErrorMessage(result.message, state?.is_admin ?? false), 'error')
@@ -620,6 +650,27 @@ export function App() {
     const killed = results.filter(
       r => r.status === 'fulfilled' && r.value.success
     ).length
+
+    // Record each successful kill in history. Spread into a single update so
+    // we don't trigger a re-render per row.
+    if (killed > 0) {
+      const ts = Date.now()
+      setKillHistory(prev => {
+        let next = prev
+        results.forEach((r, i) => {
+          if (r.status === 'fulfilled' && r.value.success) {
+            const port = portsToKill[i]
+            next = appendKillHistory({
+              port: port.port,
+              pid: port.pid,
+              processName: port.process_name,
+              timestamp: ts,
+            }, next)
+          }
+        })
+        return next
+      })
+    }
 
     showToast(`Killed ${killed}/${portsToKill.length} processes`, killed > 0 ? 'success' : 'error')
     setSelectedPorts(new Set())
@@ -859,6 +910,20 @@ export function App() {
             {preferences.alwaysOnTop
               ? <Icons.PinFilled className="w-3.5 h-3.5" />
               : <Icons.Pin className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="p-1.5 rounded-md hover:bg-dark-600 text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue/40 relative"
+            title={`Recently killed (${killHistory.length}) — press h`}
+            aria-label="Open kill history"
+          >
+            <Icons.History className="w-3.5 h-3.5" />
+            {killHistory.length > 0 && (
+              <span
+                className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-accent-blue"
+                aria-hidden="true"
+              />
+            )}
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1110,6 +1175,14 @@ export function App() {
           onShowDetails={setDetailsPort}
           onTogglePin={togglePin}
           onSelectAllByPid={selectAllByPid}
+        />
+      )}
+
+      {showHistory && (
+        <HistoryPanel
+          history={killHistory}
+          onClose={() => setShowHistory(false)}
+          onClear={() => { clearKillHistory(); setKillHistory([]) }}
         />
       )}
 
