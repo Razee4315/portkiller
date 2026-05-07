@@ -9,13 +9,15 @@ interface ContextMenuProps {
     y: number
     port: PortInfo
     isPinned?: boolean
+    siblingPortCount?: number
     onClose: () => void
     onKill: (port: PortInfo) => void
     onShowDetails: (port: PortInfo) => void
     onTogglePin?: (port: number) => void
+    onSelectAllByPid?: (pid: number) => void
 }
 
-export function ContextMenu({ x, y, port, isPinned, onClose, onKill, onShowDetails, onTogglePin }: ContextMenuProps): JSX.Element {
+export function ContextMenu({ x, y, port, isPinned, siblingPortCount = 0, onClose, onKill, onShowDetails, onTogglePin, onSelectAllByPid }: ContextMenuProps): JSX.Element {
     const ref = useRef<HTMLDivElement>(null)
     const [focusedIndex, setFocusedIndex] = useState(0)
 
@@ -35,6 +37,14 @@ export function ContextMenu({ x, y, port, isPinned, onClose, onKill, onShowDetai
             icon: <Icons.Trash className="w-4 h-4" />,
             className: 'text-accent-red',
         })
+
+        if (onSelectAllByPid && siblingPortCount > 1) {
+            menuItems.push({
+                label: `Select all ${siblingPortCount} ports from this process`,
+                action: () => { onSelectAllByPid(port.pid); onClose() },
+                icon: <Icons.Process className="w-4 h-4" />,
+            })
+        }
     }
 
     if (onTogglePin) {

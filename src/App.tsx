@@ -36,6 +36,17 @@ function fuzzyScore(query: string, target: string): number {
   return qIdx === q.length ? score : 0
 }
 
+// Port-range query: "3000-4000" matches any port in [3000, 4000]. Detected up
+// front so we can short-circuit the fuzzy scorer for an exact numeric filter.
+function parsePortRange(query: string): [number, number] | null {
+  const m = query.trim().match(/^(\d{1,5})\s*-\s*(\d{1,5})$/)
+  if (!m) return null
+  const lo = parseInt(m[1], 10)
+  const hi = parseInt(m[2], 10)
+  if (isNaN(lo) || isNaN(hi) || lo > 65535 || hi > 65535) return null
+  return lo <= hi ? [lo, hi] : [hi, lo]
+}
+
 function fuzzyMatch(query: string, port: PortInfo): number {
   const scores = [
     fuzzyScore(query, port.port.toString()) * 2,
@@ -319,13 +330,16 @@ export function App() {
       ? state.ports
       : state.ports.filter(p => p.protocol.toUpperCase() === protocolFilter.toUpperCase())
 
+    const range = searchQuery ? parsePortRange(searchQuery) : null
     const base = !searchQuery
       ? byProtocol
-      : byProtocol
-          .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
-          .filter(({ score }) => score > 0)
-          .sort((a, b) => b.score - a.score)
-          .map(({ port }) => port)
+      : range
+        ? byProtocol.filter(p => p.port >= range[0] && p.port <= range[1])
+        : byProtocol
+            .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
+            .filter(({ score }) => score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map(({ port }) => port)
 
     // Sticky-sort pinned ports to the top while preserving the inner ordering
     // (search relevance when searching, port number otherwise).
@@ -728,6 +742,22 @@ export function App() {
     setContextMenu({ x: e.clientX, y: e.clientY, port })
   }, [])
 
+  // Select every row owned by the same PID. Used by "Kill all from this
+  // process" — primes the multi-select set so the existing bulk-kill flow
+  // (with its confirmation step) handles the actual termination.
+  const selectAllByPid = useCallback((pid: number) => {
+    const ports = stateRef.current?.ports ?? []
+    const keys = ports
+      .filter(p => p.pid === pid && !p.is_protected)
+      .map(p => `${p.port}-${p.pid}`)
+    if (keys.length === 0) {
+      showToast('No killable ports for this process', 'error')
+      return
+    }
+    setSelectedPorts(new Set(keys))
+    showToast(`Selected ${keys.length} ports — press the bulk kill button to confirm`, 'success')
+  }, [showToast])
+
   const allPorts = useMemo(() =>
     customPorts.length > 0 ? customPorts : COMMON_PORTS
   , [customPorts])
@@ -828,7 +858,7 @@ export function App() {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search a port or process — try “3000” or type help"
+            placeholder='Search "3000", a process, "3000-4000", or type help'
             value={searchQuery}
             onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
             onKeyDown={handleInputKeyDown}
@@ -1016,10 +1046,12 @@ export function App() {
           y={contextMenu.y}
           port={contextMenu.port}
           isPinned={pinnedPorts.has(contextMenu.port.port)}
+          siblingPortCount={state?.ports.filter(p => p.pid === contextMenu.port.pid).length ?? 0}
           onClose={() => setContextMenu(null)}
           onKill={requestKill}
           onShowDetails={setDetailsPort}
           onTogglePin={togglePin}
+          onSelectAllByPid={selectAllByPid}
         />
       )}
 
