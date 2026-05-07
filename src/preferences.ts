@@ -1,11 +1,16 @@
 // User preferences persisted in localStorage.
 // Kept tiny and synchronous so we can apply defaults before the window is shown.
 
+export type ProtocolFilter = 'all' | 'tcp' | 'udp'
+export type SortMode = 'port-asc' | 'port-desc' | 'process' | 'pid'
+
 export interface Preferences {
   alwaysOnTop: boolean
   minimizeOnBlur: boolean
   pollIntervalMs: number
   showCommonPorts: boolean
+  protocolFilter: ProtocolFilter
+  sortMode: SortMode
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -13,7 +18,16 @@ export const DEFAULT_PREFERENCES: Preferences = {
   minimizeOnBlur: false,
   pollIntervalMs: 2000,
   showCommonPorts: true,
+  protocolFilter: 'all',
+  sortMode: 'port-asc',
 }
+
+export const SORT_OPTIONS: { label: string; value: SortMode }[] = [
+  { label: 'Port (low → high)', value: 'port-asc' },
+  { label: 'Port (high → low)', value: 'port-desc' },
+  { label: 'Process name', value: 'process' },
+  { label: 'PID', value: 'pid' },
+]
 
 export const POLL_OPTIONS: { label: string; value: number }[] = [
   { label: '1s (fast)', value: 1000 },

@@ -14,6 +14,7 @@ import {
   savePreferences,
   loadWindowState,
   saveWindowState,
+  SORT_OPTIONS,
 } from './preferences'
 import { Icons } from './components/Icons'
 import { PortGrid } from './components/PortGrid'
@@ -94,8 +95,9 @@ export function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
-  const [protocolFilter, setProtocolFilter] = useState<'all' | 'tcp' | 'udp'>('all')
   const [pinnedPorts, setPinnedPorts] = useState<Set<number>>(() => new Set(loadPinnedPorts()))
+  const protocolFilter = preferences.protocolFilter
+  const sortMode = preferences.sortMode
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
   const [lastUpdatedText, setLastUpdatedText] = useState('...')
   // Kill confirmation state (H5 - Error Prevention)
@@ -326,9 +328,23 @@ export function App() {
   const filteredPorts = useMemo(() => {
     if (!state?.ports) return []
 
+    // Apply sort first so all downstream filters preserve order.
+    const sorted = [...state.ports].sort((a, b) => {
+      switch (sortMode) {
+        case 'port-desc': return b.port - a.port
+        case 'process':
+          return a.process_name.localeCompare(b.process_name) || a.port - b.port
+        case 'pid':
+          return a.pid - b.pid || a.port - b.port
+        case 'port-asc':
+        default:
+          return a.port - b.port
+      }
+    })
+
     const byProtocol = protocolFilter === 'all'
-      ? state.ports
-      : state.ports.filter(p => p.protocol.toUpperCase() === protocolFilter.toUpperCase())
+      ? sorted
+      : sorted.filter(p => p.protocol.toUpperCase() === protocolFilter.toUpperCase())
 
     const range = searchQuery ? parsePortRange(searchQuery) : null
     const base = !searchQuery
@@ -348,7 +364,7 @@ export function App() {
     const rest: PortInfo[] = []
     base.forEach(p => (pinnedPorts.has(p.port) ? pinned : rest).push(p))
     return [...pinned, ...rest]
-  }, [state?.ports, searchQuery, protocolFilter, pinnedPorts])
+  }, [state?.ports, searchQuery, protocolFilter, sortMode, pinnedPorts])
 
   const protocolCounts = useMemo(() => {
     const counts = { tcp: 0, udp: 0 }
@@ -936,7 +952,7 @@ export function App() {
                     key={opt}
                     role="tab"
                     aria-selected={active}
-                    onClick={() => setProtocolFilter(opt)}
+                    onClick={() => updatePreferences({ protocolFilter: opt })}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider transition-colors focus:outline-none focus:ring-1 focus:ring-accent-blue/40 ${
                       active
                         ? 'bg-accent-blue/20 text-accent-blue'
@@ -951,6 +967,17 @@ export function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <select
+              value={sortMode}
+              onChange={(e) => updatePreferences({ sortMode: (e.target as HTMLSelectElement).value as Preferences['sortMode'] })}
+              className="bg-dark-700 border border-dark-600 text-gray-300 text-[11px] rounded px-1.5 py-0.5 hover:text-white focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
+              title="Sort listening ports"
+              aria-label="Sort listening ports"
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
             <button
               onClick={() => handleExport('json')}
               className="text-gray-400 hover:text-white text-[11px] transition-colors px-2 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
@@ -990,10 +1017,22 @@ export function App() {
             <div className="flex flex-col items-center justify-center h-32 text-center">
               <Icons.Empty className="w-6 h-6 text-gray-300 mb-2" />
               <p className="text-gray-300 text-xs">
-                {searchQuery ? 'No matching ports found' : 'No listening ports detected'}
+                {searchQuery
+                  ? 'No matching ports found'
+                  : protocolFilter !== 'all'
+                  ? `No ${protocolFilter.toUpperCase()} ports listening`
+                  : 'No listening ports detected'}
               </p>
               {searchQuery && (
                 <p className="text-gray-500 text-[10px] mt-1">Try a different search term or type "clear"</p>
+              )}
+              {!searchQuery && protocolFilter !== 'all' && (state?.ports.length ?? 0) > 0 && (
+                <button
+                  onClick={() => updatePreferences({ protocolFilter: 'all' })}
+                  className="btn btn-ghost mt-2 text-[11px] px-2 py-1"
+                >
+                  Show all {state?.ports.length ?? 0} ports
+                </button>
               )}
             </div>
           ) : (
