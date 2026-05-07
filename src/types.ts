@@ -28,13 +28,17 @@ export interface CommonPort {
 
 export const COMMON_PORTS: CommonPort[] = [
   { port: 3000, label: '3000', description: 'React/Node' },
-  { port: 8080, label: '8080', description: 'Spring/Tomcat' },
-  { port: 5000, label: '5000', description: 'Flask' },
-  { port: 5432, label: '5432', description: 'PostgreSQL' },
-  { port: 8000, label: '8000', description: 'Django' },
-  { port: 4200, label: '4200', description: 'Angular' },
   { port: 3001, label: '3001', description: 'Dev Server' },
   { port: 5173, label: '5173', description: 'Vite' },
+  { port: 4200, label: '4200', description: 'Angular' },
+  { port: 4321, label: '4321', description: 'Astro' },
+  { port: 8080, label: '8080', description: 'Spring/Tomcat' },
+  { port: 8000, label: '8000', description: 'Django' },
+  { port: 5000, label: '5000', description: 'Flask' },
+  { port: 5432, label: '5432', description: 'PostgreSQL' },
+  { port: 3306, label: '3306', description: 'MySQL' },
+  { port: 6379, label: '6379', description: 'Redis' },
+  { port: 27017, label: '27017', description: 'MongoDB' },
 ];
 
 const CUSTOM_PORTS_KEY = 'portkiller_custom_ports';

@@ -730,6 +730,18 @@ export function App() {
       showToast('Commands: admin, refresh, clear, settings, kill [port], export [json|csv]', 'success')
       return true
     }
+    if (trimmed === 'kill all' || trimmed === 'killall') {
+      const currentState = stateRef.current
+      const matches = currentState?.ports.filter(p => !p.is_protected) ?? []
+      if (matches.length === 0) {
+        showToast('No killable ports', 'error')
+        return true
+      }
+      setSelectedPorts(new Set(matches.map(p => `${p.port}-${p.pid}`)))
+      showToast(`Selected all ${matches.length} killable ports — confirm with bulk kill button`, 'success')
+      return true
+    }
+
     if (trimmed.startsWith('kill ')) {
       const arg = trimmed.slice(5).trim()
       const currentState = stateRef.current
@@ -1128,6 +1140,18 @@ export function App() {
         >
           <div className="flex items-center gap-2">
             <span>{state.ports.length} port{state.ports.length !== 1 ? 's' : ''}</span>
+            {pinnedPorts.size > 0 && (
+              <>
+                <span className="text-gray-600">·</span>
+                <span
+                  className="text-accent-blue flex items-center gap-1"
+                  title={`${pinnedPorts.size} pinned port${pinnedPorts.size !== 1 ? 's' : ''}`}
+                >
+                  <Icons.PinFilled className="w-2.5 h-2.5" />
+                  {pinnedPorts.size}
+                </span>
+              </>
+            )}
             <span className="text-gray-600">·</span>
             <span className="text-gray-500" title="Last refreshed">{lastUpdatedText}</span>
             {preferences.pollIntervalMs === 0 && (
