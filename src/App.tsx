@@ -359,6 +359,17 @@ export function App() {
           setShowSettings(false)
           return
         }
+        if (searchQuery) {
+          e.preventDefault()
+          setSearchQuery('')
+          setSelectedIndex(-1)
+          inputRef.current?.focus()
+          return
+        }
+        if (selectedPorts.size > 0) {
+          setSelectedPorts(new Set())
+          return
+        }
         e.preventDefault()
         await appWindow.hide()
         return
@@ -413,7 +424,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill, searchQuery, selectedPorts])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -899,6 +910,7 @@ export function App() {
               ?
             </button>
             <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Focus search">/</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Clear search / hide window">Esc</kbd>
             <kbd className="px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500 font-mono text-[10px] text-gray-300" title="Toggle window from anywhere">Alt+P</kbd>
           </div>
         </footer>
