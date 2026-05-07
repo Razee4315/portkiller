@@ -27,6 +27,14 @@ function getChangeClass(change?: ChangeState): string {
   }
 }
 
+// 0.0.0.0 / :: bindings are reachable from any network interface, which is a
+// security-relevant signal worth surfacing in the row.
+function isPublicBinding(addr: string): boolean {
+  if (!addr) return false
+  const lower = addr.toLowerCase()
+  return lower.startsWith('0.0.0.0') || lower === '::' || lower.startsWith('::') && !lower.startsWith('::1')
+}
+
 export function PortList({
   ports,
   onKill,
@@ -78,6 +86,14 @@ export function PortList({
                   </span>
                   {changeState === 'new' && (
                     <span className="text-accent-green text-[10px] font-medium">New</span>
+                  )}
+                  {isPublicBinding(portInfo.local_address) && (
+                    <span
+                      className="text-accent-yellow text-[9px] font-semibold uppercase px-1 py-px bg-accent-yellow/10 rounded tracking-wider"
+                      title={`Bound to ${portInfo.local_address} — reachable from any network interface`}
+                    >
+                      Public
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-[12px] text-gray-300 truncate">

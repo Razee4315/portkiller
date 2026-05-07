@@ -60,6 +60,16 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
             action: () => { navigator.clipboard.writeText(port.pid.toString()); onClose() },
             icon: <Icons.Copy className="w-4 h-4" />,
         },
+        {
+            label: 'Copy taskkill command',
+            action: () => { navigator.clipboard.writeText(`taskkill /F /PID ${port.pid}`); onClose() },
+            icon: <Icons.Copy className="w-4 h-4" />,
+        },
+        {
+            label: 'Copy PowerShell kill',
+            action: () => { navigator.clipboard.writeText(`Stop-Process -Id ${port.pid} -Force`); onClose() },
+            icon: <Icons.Copy className="w-4 h-4" />,
+        },
     )
 
     if (port.process_path) {

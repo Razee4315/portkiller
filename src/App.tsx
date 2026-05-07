@@ -83,6 +83,7 @@ export function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; port: PortInfo } | null>(null)
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
+  const [protocolFilter, setProtocolFilter] = useState<'all' | 'tcp' | 'udp'>('all')
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
   const [lastUpdatedText, setLastUpdatedText] = useState('...')
   // Kill confirmation state (H5 - Error Prevention)
@@ -312,14 +313,29 @@ export function App() {
 
   const filteredPorts = useMemo(() => {
     if (!state?.ports) return []
-    if (!searchQuery) return state.ports
 
-    return state.ports
+    const byProtocol = protocolFilter === 'all'
+      ? state.ports
+      : state.ports.filter(p => p.protocol.toUpperCase() === protocolFilter.toUpperCase())
+
+    if (!searchQuery) return byProtocol
+
+    return byProtocol
       .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
       .map(({ port }) => port)
-  }, [state?.ports, searchQuery])
+  }, [state?.ports, searchQuery, protocolFilter])
+
+  const protocolCounts = useMemo(() => {
+    const counts = { tcp: 0, udp: 0 }
+    state?.ports.forEach(p => {
+      const proto = p.protocol.toUpperCase()
+      if (proto === 'TCP') counts.tcp++
+      else if (proto === 'UDP') counts.udp++
+    })
+    return counts
+  }, [state?.ports])
 
   useEffect(() => { filteredPortsRef.current = filteredPorts }, [filteredPorts])
 
@@ -815,10 +831,36 @@ export function App() {
 
       {/* Port list */}
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between">
-          <span className="text-gray-300 text-[12px] font-medium">
-            {searchQuery ? 'Search results' : 'All listening ports'}
-          </span>
+        <div className="px-3 py-2 border-b border-dark-600 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-300 text-[12px] font-medium">
+              {searchQuery ? 'Search results' : 'All listening ports'}
+            </span>
+            <div role="tablist" aria-label="Filter by protocol" className="flex items-center gap-0.5 ml-1 p-0.5 rounded bg-dark-700 border border-dark-600">
+              {(['all', 'tcp', 'udp'] as const).map(opt => {
+                const active = protocolFilter === opt
+                const count = opt === 'all'
+                  ? (state?.ports.length ?? 0)
+                  : opt === 'tcp' ? protocolCounts.tcp : protocolCounts.udp
+                return (
+                  <button
+                    key={opt}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setProtocolFilter(opt)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider transition-colors focus:outline-none focus:ring-1 focus:ring-accent-blue/40 ${
+                      active
+                        ? 'bg-accent-blue/20 text-accent-blue'
+                        : 'text-gray-400 hover:text-white hover:bg-dark-600'
+                    }`}
+                    title={opt === 'all' ? 'Show all protocols' : `Show only ${opt.toUpperCase()} ports`}
+                  >
+                    {opt} <span className="opacity-60">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <button
               onClick={() => handleExport('json')}
