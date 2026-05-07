@@ -523,6 +523,25 @@ export function App() {
         return
       }
 
+      // Space — toggle multi-select membership for the currently-focused row,
+      // mirroring how Ctrl+Click works with the mouse. Powerful for keyboard
+      // users building a bulk-kill set.
+      if (e.key === ' ' && !isInputFocused && !e.ctrlKey && !e.metaKey && selectedIndex >= 0) {
+        e.preventDefault()
+        const port = ports[selectedIndex]
+        if (port) {
+          const key = `${port.port}-${port.pid}`
+          if (pendingBulkKill) setPendingBulkKill(false)
+          setSelectedPorts(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+          })
+        }
+        return
+      }
+
       // Ctrl+C with a port selected (and search not focused) — copy "port:pid"
       if (e.ctrlKey && e.key === 'c' && !isInputFocused && selectedIndex >= 0) {
         const port = ports[selectedIndex]
@@ -557,7 +576,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast, setPendingBulkKill])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -742,6 +761,44 @@ export function App() {
       showToast('Commands: admin, refresh, clear, settings, kill [port], export [json|csv]', 'success')
       return true
     }
+    // Pin/unpin via the search bar so power users don't have to mouse over
+    // a row to toggle a favorite.
+    if (trimmed.startsWith('pin ') || trimmed.startsWith('unpin ')) {
+      const isUnpin = trimmed.startsWith('unpin ')
+      const portNum = parseInt(trimmed.slice(isUnpin ? 6 : 4), 10)
+      if (!isNaN(portNum) && portNum >= 1 && portNum <= 65535) {
+        const isPinned = pinnedPorts.has(portNum)
+        if (isUnpin && !isPinned) {
+          showToast(`Port ${portNum} is not pinned`, 'error')
+          return true
+        }
+        if (!isUnpin && isPinned) {
+          showToast(`Port ${portNum} is already pinned`, 'success')
+          return true
+        }
+        togglePin(portNum)
+        showToast(`${isUnpin ? 'Unpinned' : 'Pinned'} port ${portNum}`, 'success')
+        return true
+      }
+    }
+
+    if (trimmed === 'unpin all' || trimmed === 'unpinall') {
+      if (pinnedPorts.size === 0) {
+        showToast('No pinned ports', 'error')
+        return true
+      }
+      const count = pinnedPorts.size
+      setPinnedPorts(new Set())
+      savePinnedPorts([])
+      showToast(`Unpinned ${count} port${count !== 1 ? 's' : ''}`, 'success')
+      return true
+    }
+
+    if (trimmed === 'history') {
+      setShowHistory(true)
+      return true
+    }
+
     if (trimmed === 'kill all' || trimmed === 'killall') {
       const currentState = stateRef.current
       const matches = currentState?.ports.filter(p => !p.is_protected) ?? []
@@ -792,7 +849,7 @@ export function App() {
     }
 
     return false
-  }, [fetchPorts, showToast, handleRestartAsAdmin, handleExport, requestKill])
+  }, [fetchPorts, showToast, handleRestartAsAdmin, handleExport, requestKill, togglePin, pinnedPorts])
 
   const handleInputKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter') {
