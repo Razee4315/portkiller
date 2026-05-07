@@ -69,3 +69,25 @@ export interface ProcessDetails {
   cpu_percent: number;
   children: number[];
 }
+
+// Pinned ports — user-favorited port numbers that get sticky-sorted to the top
+// of the list. Stored independently of the "common ports" grid which is a
+// fixed reference, while pins follow the user's day-to-day workflow.
+const PINNED_PORTS_KEY = 'portkiller_pinned_ports_v1';
+
+export function loadPinnedPorts(): number[] {
+  try {
+    const raw = localStorage.getItem(PINNED_PORTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter(n => typeof n === 'number');
+  } catch { }
+  return [];
+}
+
+export function savePinnedPorts(ports: number[]): void {
+  try {
+    if (ports.length === 0) localStorage.removeItem(PINNED_PORTS_KEY);
+    else localStorage.setItem(PINNED_PORTS_KEY, JSON.stringify(ports));
+  } catch { }
+}

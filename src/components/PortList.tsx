@@ -10,6 +10,8 @@ interface PortListProps {
   selectedPorts?: Set<string>
   portChanges?: Map<string, ChangeState>
   pendingKill?: string | null
+  pinnedPorts?: Set<number>
+  onTogglePin?: (port: number) => void
   onPortClick?: (port: PortInfo, e: MouseEvent) => void
   onContextMenu?: (port: PortInfo, e: MouseEvent) => void
   onShowDetails?: (port: PortInfo) => void
@@ -17,6 +19,7 @@ interface PortListProps {
 
 // Stable references to avoid creating new objects every render
 const EMPTY_SET = new Set<string>()
+const EMPTY_NUM_SET = new Set<number>()
 const EMPTY_MAP = new Map<string, ChangeState>()
 
 function getChangeClass(change?: ChangeState): string {
@@ -43,6 +46,8 @@ export function PortList({
   selectedPorts = EMPTY_SET,
   portChanges = EMPTY_MAP,
   pendingKill = null,
+  pinnedPorts = EMPTY_NUM_SET,
+  onTogglePin,
   onPortClick,
   onContextMenu,
   onShowDetails,
@@ -56,6 +61,7 @@ export function PortList({
         const isSelected = selectedIndex === index || selectedPorts.has(key)
         const changeState = portChanges.get(key)
         const isPendingKill = pendingKill === key
+        const isPinned = pinnedPorts.has(portInfo.port)
 
         return (
           <div
@@ -104,6 +110,21 @@ export function PortList({
             </div>
 
             <div className="flex items-center gap-1.5">
+              {onTogglePin && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTogglePin(portInfo.port) }}
+                  className={`p-1.5 rounded-md transition-all focus:outline-none focus:ring-1 focus:ring-accent-blue/40 ${
+                    isPinned
+                      ? 'text-accent-blue opacity-100'
+                      : 'text-gray-400 hover:text-white hover:bg-dark-600 opacity-30 group-hover:opacity-100 focus:opacity-100'
+                  }`}
+                  title={isPinned ? `Unpin port ${portInfo.port}` : `Pin port ${portInfo.port} to top`}
+                  aria-label={isPinned ? `Unpin port ${portInfo.port}` : `Pin port ${portInfo.port}`}
+                  aria-pressed={isPinned}
+                >
+                  {isPinned ? <Icons.PinFilled className="w-3.5 h-3.5" /> : <Icons.Pin className="w-3.5 h-3.5" />}
+                </button>
+              )}
               {onShowDetails && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowDetails(portInfo) }}

@@ -9,8 +9,11 @@ interface ShortcutsPanelProps {
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['/'], label: 'Focus search' },
   { keys: ['↑', '↓'], label: 'Move selection' },
+  { keys: ['j', 'k'], label: 'Move selection (vim-style)' },
   { keys: ['Enter'], label: 'Kill selected port (twice to confirm)' },
   { keys: ['Delete'], label: 'Kill selected port' },
+  { keys: ['p'], label: 'Pin / unpin selected port' },
+  { keys: ['Ctrl', 'C'], label: 'Copy selected port:pid' },
   { keys: ['Esc'], label: 'Close menu / cancel pending kill / hide window' },
   { keys: ['Ctrl', 'A'], label: 'Select all visible ports' },
   { keys: ['Alt', 'P'], label: 'Toggle window from anywhere (global)' },

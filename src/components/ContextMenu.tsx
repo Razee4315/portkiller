@@ -8,12 +8,14 @@ interface ContextMenuProps {
     x: number
     y: number
     port: PortInfo
+    isPinned?: boolean
     onClose: () => void
     onKill: (port: PortInfo) => void
     onShowDetails: (port: PortInfo) => void
+    onTogglePin?: (port: number) => void
 }
 
-export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: ContextMenuProps): JSX.Element {
+export function ContextMenu({ x, y, port, isPinned, onClose, onKill, onShowDetails, onTogglePin }: ContextMenuProps): JSX.Element {
     const ref = useRef<HTMLDivElement>(null)
     const [focusedIndex, setFocusedIndex] = useState(0)
 
@@ -32,6 +34,14 @@ export function ContextMenu({ x, y, port, onClose, onKill, onShowDetails }: Cont
             action: () => { onKill(port); onClose() },
             icon: <Icons.Trash className="w-4 h-4" />,
             className: 'text-accent-red',
+        })
+    }
+
+    if (onTogglePin) {
+        menuItems.push({
+            label: isPinned ? 'Unpin Port' : 'Pin Port to Top',
+            action: () => { onTogglePin(port.port); onClose() },
+            icon: isPinned ? <Icons.PinFilled className="w-4 h-4" /> : <Icons.Pin className="w-4 h-4" />,
         })
     }
 

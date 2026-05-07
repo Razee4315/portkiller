@@ -7,7 +7,7 @@ import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/
 // drop-in compatible with the v1 code below.
 const appWindow = getCurrentWindow()
 import type { AppState, PortInfo, KillResult, ChangeState } from './types'
-import { COMMON_PORTS, loadCustomPorts, saveCustomPorts } from './types'
+import { COMMON_PORTS, loadCustomPorts, saveCustomPorts, loadPinnedPorts, savePinnedPorts } from './types'
 import type { Preferences } from './preferences'
 import {
   loadPreferences,
@@ -84,6 +84,7 @@ export function App() {
   const [customPorts, setCustomPorts] = useState(loadCustomPorts())
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [protocolFilter, setProtocolFilter] = useState<'all' | 'tcp' | 'udp'>('all')
+  const [pinnedPorts, setPinnedPorts] = useState<Set<number>>(() => new Set(loadPinnedPorts()))
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
   const [lastUpdatedText, setLastUpdatedText] = useState('...')
   // Kill confirmation state (H5 - Error Prevention)
@@ -318,14 +319,22 @@ export function App() {
       ? state.ports
       : state.ports.filter(p => p.protocol.toUpperCase() === protocolFilter.toUpperCase())
 
-    if (!searchQuery) return byProtocol
+    const base = !searchQuery
+      ? byProtocol
+      : byProtocol
+          .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
+          .filter(({ score }) => score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map(({ port }) => port)
 
-    return byProtocol
-      .map(p => ({ port: p, score: fuzzyMatch(searchQuery, p) }))
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(({ port }) => port)
-  }, [state?.ports, searchQuery, protocolFilter])
+    // Sticky-sort pinned ports to the top while preserving the inner ordering
+    // (search relevance when searching, port number otherwise).
+    if (pinnedPorts.size === 0) return base
+    const pinned: PortInfo[] = []
+    const rest: PortInfo[] = []
+    base.forEach(p => (pinnedPorts.has(p.port) ? pinned : rest).push(p))
+    return [...pinned, ...rest]
+  }, [state?.ports, searchQuery, protocolFilter, pinnedPorts])
 
   const protocolCounts = useMemo(() => {
     const counts = { tcp: 0, udp: 0 }
@@ -348,6 +357,28 @@ export function App() {
   const getCommonPortStatus = useCallback((port: number): PortInfo | undefined => {
     return portMap.get(port)
   }, [portMap])
+
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
+    setToast({ message, type })
+    const duration = type === 'error' ? 5000 : 3000
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null)
+      toastTimerRef.current = null
+    }, duration)
+  }, [])
+
+  const togglePin = useCallback((portNumber: number) => {
+    setPinnedPorts(prev => {
+      const next = new Set(prev)
+      if (next.has(portNumber)) next.delete(portNumber)
+      else next.add(portNumber)
+      savePinnedPorts(Array.from(next))
+      return next
+    })
+  }, [])
 
   // Global keyboard handler
   useEffect(() => {
@@ -406,15 +437,35 @@ export function App() {
       }
 
       const ports = filteredPortsRef.current
-      if (e.key === 'ArrowDown') {
+      const isInputFocused = document.activeElement === inputRef.current
+      if (e.key === 'ArrowDown' || (e.key === 'j' && !isInputFocused && !e.ctrlKey && !e.metaKey)) {
         e.preventDefault()
         setSelectedIndex(prev => Math.min(prev + 1, ports.length - 1))
         return
       }
-      if (e.key === 'ArrowUp') {
+      if (e.key === 'ArrowUp' || (e.key === 'k' && !isInputFocused && !e.ctrlKey && !e.metaKey)) {
         e.preventDefault()
         setSelectedIndex(prev => Math.max(prev - 1, -1))
         return
+      }
+
+      // p — pin/unpin the currently-selected port
+      if (e.key === 'p' && !isInputFocused && !e.ctrlKey && !e.metaKey && selectedIndex >= 0) {
+        e.preventDefault()
+        const port = ports[selectedIndex]
+        if (port) togglePin(port.port)
+        return
+      }
+
+      // Ctrl+C with a port selected (and search not focused) — copy "port:pid"
+      if (e.ctrlKey && e.key === 'c' && !isInputFocused && selectedIndex >= 0) {
+        const port = ports[selectedIndex]
+        if (port) {
+          e.preventDefault()
+          navigator.clipboard.writeText(`${port.port}:${port.pid}`)
+          showToast(`Copied ${port.port}:${port.pid}`, 'success')
+          return
+        }
       }
 
       if (e.key === 'Enter' && selectedIndex >= 0 && document.activeElement !== inputRef.current) {
@@ -440,7 +491,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill, searchQuery, selectedPorts])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -449,17 +500,6 @@ export function App() {
     }
   }, [selectedIndex])
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current)
-    }
-    setToast({ message, type })
-    const duration = type === 'error' ? 5000 : 3000
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null)
-      toastTimerRef.current = null
-    }, duration)
-  }, [])
 
   useEffect(() => {
     return () => {
@@ -916,6 +956,8 @@ export function App() {
               selectedPorts={selectedPorts}
               portChanges={portChanges}
               pendingKill={pendingKill}
+              pinnedPorts={pinnedPorts}
+              onTogglePin={togglePin}
               onPortClick={handlePortClick}
               onContextMenu={handleContextMenu}
               onShowDetails={setDetailsPort}
@@ -973,9 +1015,11 @@ export function App() {
           x={contextMenu.x}
           y={contextMenu.y}
           port={contextMenu.port}
+          isPinned={pinnedPorts.has(contextMenu.port.port)}
           onClose={() => setContextMenu(null)}
           onKill={requestKill}
           onShowDetails={setDetailsPort}
+          onTogglePin={togglePin}
         />
       )}
 
