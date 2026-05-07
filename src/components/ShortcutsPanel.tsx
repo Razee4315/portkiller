@@ -22,6 +22,8 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
 
 const COMMANDS: { cmd: string; label: string }[] = [
   { cmd: 'kill 3000', label: 'Kill the process on port 3000' },
+  { cmd: 'kill 3000-4000', label: 'Select every port in a range for bulk kill' },
+  { cmd: '3000-4000', label: 'Filter the list to ports in that range' },
   { cmd: 'admin', label: 'Restart as Administrator' },
   { cmd: 'refresh', label: 'Refresh the port list now' },
   { cmd: 'export json', label: 'Copy listening ports to clipboard as JSON' },

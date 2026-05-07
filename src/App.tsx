@@ -664,9 +664,28 @@ export function App() {
       return true
     }
     if (trimmed.startsWith('kill ')) {
-      const portNum = parseInt(trimmed.slice(5), 10)
+      const arg = trimmed.slice(5).trim()
       const currentState = stateRef.current
-      if (!isNaN(portNum) && currentState) {
+      if (!currentState) return true
+
+      // "kill 3000-4000" — arm a multi-select for the bulk-kill flow rather
+      // than terminating without confirmation.
+      const range = parsePortRange(arg)
+      if (range) {
+        const matches = currentState.ports.filter(
+          p => p.port >= range[0] && p.port <= range[1] && !p.is_protected
+        )
+        if (matches.length === 0) {
+          showToast(`No killable ports in range ${range[0]}-${range[1]}`, 'error')
+          return true
+        }
+        setSelectedPorts(new Set(matches.map(p => `${p.port}-${p.pid}`)))
+        showToast(`Selected ${matches.length} ports — confirm with bulk kill button`, 'success')
+        return true
+      }
+
+      const portNum = parseInt(arg, 10)
+      if (!isNaN(portNum)) {
         const portInfo = currentState.ports.find(p => p.port === portNum)
         if (portInfo) {
           requestKill(portInfo)

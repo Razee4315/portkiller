@@ -44,11 +44,16 @@ PortKiller is a lightweight, always-ready Windows utility that shows which proce
 ## Features
 
 - **Global Hotkey** — `Alt+P` to show/hide from anywhere
-- **Keyboard Navigation** — Arrow keys, Enter to kill, fuzzy search
-- **Command Palette** — Type `kill 3000`, `admin`, `refresh`
-- **Multi-Select** — `Ctrl+Click` to select, bulk kill
+- **Keyboard Navigation** — Arrow keys or vim-style `j/k`, fuzzy search
+- **Command Palette** — `kill 3000`, `kill 3000-4000`, `admin`, `refresh`
+- **Range Search** — Type `3000-4000` to filter to a port range
+- **Pinned Ports** — Press `p` to pin favorites; they stick to the top
+- **Protocol Filter** — One-click toggle for All / TCP / UDP
+- **Public Binding Badge** — Spot ports bound to `0.0.0.0` instantly
+- **Multi-Select** — `Ctrl+Click` or "select all from this PID" for bulk kill
 - **Real-Time Updates** — Green/red highlighting for port changes
 - **Process Details** — Double-click for memory, CPU, quick actions
+- **Copy as Command** — Copy `taskkill` / `Stop-Process` for terminal use
 - **Customizable Ports** — Configure your common dev ports
 - **Admin Elevation** — One-click restart with elevated privileges
 
@@ -71,20 +76,27 @@ macOS and Linux support is not planned (Windows-specific utility).
 | Shortcut | Action |
 |----------|--------|
 | `Alt+P` | Show/hide overlay |
-| `↑/↓` | Navigate list |
-| `Enter` | Kill selected process |
+| `↑/↓` or `j/k` | Navigate list |
+| `Enter` | Kill selected process (twice to confirm) |
+| `p` | Pin/unpin selected port |
+| `Ctrl+C` | Copy selected `port:pid` |
+| `Ctrl+A` | Select all visible ports |
 | `Ctrl+Click` | Multi-select |
-| `Esc` | Hide window |
+| `Esc` | Clear search / cancel / hide window |
 | `/` | Focus search |
+| `?` | Keyboard cheatsheet |
 
-### Commands
+### Commands & Search
 
 Type these directly in the search bar:
 
 - `kill <port>` — Kill process on a specific port
+- `kill 3000-4000` — Select every port in a range for bulk kill
+- `3000-4000` — Filter the list to ports in that range
 - `admin` — Restart with elevated privileges
 - `refresh` — Refresh the port list
-- `export json` — Export port data
+- `export json` / `export csv` — Copy port data to clipboard
+- `clear` — Clear search and selection
 
 ---
 
