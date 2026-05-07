@@ -180,6 +180,25 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     <span className="text-gray-400 text-sm">Process</span>
                                     <span className="text-white text-sm truncate max-w-[200px]">{port.process_name}</span>
                                 </div>
+                                {port.local_address && (
+                                    <div className="flex justify-between items-start">
+                                        <span className="text-gray-400 text-sm">Bound to</span>
+                                        <span
+                                            className={`text-sm font-mono truncate max-w-[220px] ${
+                                                port.local_address.startsWith('0.0.0.0') || port.local_address.startsWith('::')
+                                                    ? 'text-accent-yellow'
+                                                    : 'text-white'
+                                            }`}
+                                            title={
+                                                port.local_address.startsWith('0.0.0.0') || port.local_address.startsWith('::')
+                                                    ? 'Bound to all interfaces — reachable from outside this machine'
+                                                    : 'Bound to a single interface'
+                                            }
+                                        >
+                                            {port.local_address}
+                                        </span>
+                                    </div>
+                                )}
                                 {port.process_path && (
                                     <div>
                                         <span className="text-gray-400 text-sm block mb-1">Path</span>

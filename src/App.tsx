@@ -132,6 +132,18 @@ export function App() {
   // Keep stateRef in sync
   useEffect(() => { stateRef.current = state }, [state])
 
+  // Push the listening-port count into the tray tooltip so the user can read
+  // it without opening the window. Best-effort — the command is fire-and-
+  // forget and ignored if the tray icon isn't ready yet.
+  useEffect(() => {
+    if (!state) return
+    const count = state.ports.length
+    const text = count === 0
+      ? 'PortKiller — no listening ports'
+      : `PortKiller — ${count} listening port${count === 1 ? '' : 's'}`
+    invoke('set_tray_tooltip', { text }).catch(() => {})
+  }, [state?.ports.length])
+
   // Update "last updated" text every second
   useEffect(() => {
     const interval = setInterval(() => {

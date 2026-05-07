@@ -353,6 +353,14 @@ fn hide_main_window(window: WebviewWindow) {
     let _ = window.hide();
 }
 
+#[tauri::command]
+fn set_tray_tooltip(app: AppHandle, text: String) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_tooltip(Some(text)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn show_window(window: &WebviewWindow) {
     // Don't re-center on every show — the frontend persists the user's last
     // position and we want to honor it. center=true in tauri.conf.json still
@@ -441,9 +449,10 @@ fn main() {
                 .default_window_icon()
                 .ok_or("missing default window icon")?
                 .clone();
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id("main")
                 .icon(icon)
                 .menu(&menu)
+                .tooltip("PortKiller")
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => handle_tray_show(app),
@@ -470,7 +479,8 @@ fn main() {
             open_task_manager,
             kill_process,
             restart_as_admin,
-            hide_main_window
+            hide_main_window,
+            set_tray_tooltip
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
