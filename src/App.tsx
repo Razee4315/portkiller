@@ -420,6 +420,24 @@ export function App() {
 
   useEffect(() => { filteredPortsRef.current = filteredPorts }, [filteredPorts])
 
+  // Drop selections for ports that have left the list (process exited or
+  // filtered out). Without this, the bulk-kill button keeps an inflated count
+  // and can confirm a kill against rows the user can no longer see.
+  useEffect(() => {
+    if (selectedPorts.size === 0) return
+    const live = new Set(state?.ports.map(p => `${p.port}-${p.pid}`) ?? [])
+    let changed = false
+    const next = new Set<string>()
+    selectedPorts.forEach(key => {
+      if (live.has(key)) next.add(key)
+      else changed = true
+    })
+    if (changed) {
+      setSelectedPorts(next)
+      if (next.size === 0) setPendingBulkKill(false)
+    }
+  }, [state?.ports])
+
   const portMap = useMemo(() => {
     const map = new Map<number, PortInfo>()
     state?.ports.forEach(p => map.set(p.port, p))
@@ -589,11 +607,19 @@ export function App() {
         setSelectedPorts(new Set(ports.map(p => `${p.port}-${p.pid}`)))
         return
       }
+
+      // F5 or Ctrl+R — manual refresh, mirroring the in-search "refresh" command.
+      // We stop the browser from reloading the webview, which would lose state.
+      if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+        e.preventDefault()
+        fetchPorts()
+        return
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast, setPendingBulkKill])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast, setPendingBulkKill, fetchPorts])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -1130,6 +1156,19 @@ export function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => fetchPorts()}
+              disabled={loading}
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-1.5 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40 disabled:opacity-50 disabled:cursor-wait flex items-center gap-1"
+              title="Refresh now (F5)"
+              aria-label="Refresh listening ports"
+            >
+              {loading ? (
+                <Icons.Spinner className="w-3 h-3 animate-spin" />
+              ) : (
+                <Icons.Refresh className="w-3 h-3" />
+              )}
+            </button>
             <select
               value={sortMode}
               onChange={(e) => updatePreferences({ sortMode: (e.target as HTMLSelectElement).value as Preferences['sortMode'] })}
