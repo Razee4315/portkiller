@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
+import { getCurrentWindow, LogicalPosition, LogicalSize, availableMonitors } from '@tauri-apps/api/window'
 
 // In v2 there's no global `appWindow` singleton — each component grabs the
 // current window via getCurrentWindow(). One module-level call keeps things
@@ -305,6 +305,23 @@ export function App() {
     if (saved) {
       ;(async () => {
         try {
+          // Validate that the saved window rect intersects an existing monitor.
+          // Without this, unplugging an external display strands the window
+          // off-screen and the user can't drag it back.
+          const monitors = await availableMonitors().catch(() => [])
+          const visible = monitors.length === 0 || monitors.some(m => {
+            const factor = m.scaleFactor || 1
+            const mx = m.position.x / factor
+            const my = m.position.y / factor
+            const mw = m.size.width / factor
+            const mh = m.size.height / factor
+            // Require at least 100x60 logical px of overlap so the title bar
+            // is reachable for dragging.
+            const overlapX = Math.min(saved.x + saved.width, mx + mw) - Math.max(saved.x, mx)
+            const overlapY = Math.min(saved.y + saved.height, my + mh) - Math.max(saved.y, my)
+            return overlapX >= 100 && overlapY >= 60
+          })
+          if (!visible) return
           await appWindow.setSize(new LogicalSize(saved.width, saved.height))
           await appWindow.setPosition(new LogicalPosition(saved.x, saved.y))
         } catch {
