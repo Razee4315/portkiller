@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { open as openShell } from '@tauri-apps/plugin-shell'
 import type { PortInfo, ProcessDetails } from '../types'
 import { Icons } from './Icons'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 interface DetailsPanelProps {
     port: PortInfo
@@ -56,46 +57,9 @@ export function DetailsPanel({ port, onClose, onKill, onCopy }: DetailsPanelProp
         }
     }, [port.pid])
 
-    // Focus trap for modal accessibility, plus return focus to the previously
-    // focused element when the modal closes.
-    useEffect(() => {
-        const modal = modalRef.current
-        if (!modal) return
-
-        const previouslyFocused = document.activeElement as HTMLElement | null
-
-        const focusableSelector = 'button, [tabindex]:not([tabindex="-1"])'
-        const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
-
-        const handleTab = (e: KeyboardEvent) => {
-            if (e.key !== 'Tab') return
-            const focusable = getFocusable()
-            if (focusable.length === 0) return
-
-            const first = focusable[0]
-            const last = focusable[focusable.length - 1]
-
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault()
-                last.focus()
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault()
-                first.focus()
-            }
-        }
-
-        document.addEventListener('keydown', handleTab)
-        const focusable = getFocusable()
-        if (focusable.length > 0) focusable[0].focus()
-
-        return () => {
-            document.removeEventListener('keydown', handleTab)
-            // Best-effort focus restore — the trigger may have unmounted.
-            if (previouslyFocused && document.body.contains(previouslyFocused)) {
-                previouslyFocused.focus()
-            }
-        }
-    }, [loading])
+    // Re-run focus trap once the loading skeleton swaps for the real content
+    // so newly-rendered buttons are reachable from the start.
+    useFocusTrap(modalRef, [loading])
 
     const openFolder = async () => {
         if (!port.process_path) return
