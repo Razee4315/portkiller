@@ -1309,6 +1309,7 @@ export function App() {
           port={detailsPort}
           onClose={() => setDetailsPort(null)}
           onKill={requestKill}
+          onCopy={(label) => showToast(`Copied ${label}`, 'success')}
         />
       )}
 
@@ -1324,6 +1325,7 @@ export function App() {
           onShowDetails={setDetailsPort}
           onTogglePin={togglePin}
           onSelectAllByPid={selectAllByPid}
+          onCopy={(label) => showToast(`Copied ${label}`, 'success')}
         />
       )}
 

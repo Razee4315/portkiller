@@ -18,6 +18,8 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ['Esc'], label: 'Close menu / cancel pending kill / hide window' },
   { keys: ['Space'], label: 'Toggle multi-select on focused row' },
   { keys: ['Ctrl', 'A'], label: 'Select all visible ports' },
+  { keys: ['F5'], label: 'Refresh port list now' },
+  { keys: ['Ctrl', 'R'], label: 'Refresh port list now' },
   { keys: ['Alt', 'P'], label: 'Toggle window from anywhere (global)' },
   { keys: ['?'], label: 'Show this cheatsheet' },
 ]

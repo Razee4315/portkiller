@@ -72,10 +72,14 @@ export function SettingsPanel({
         if (isNaN(portNum) || portNum < 1 || portNum > 65535) return
         if (ports.some(p => p.port === portNum)) return
 
+        // Cap description length to keep the layout tight and prevent
+        // accidental localStorage bloat from a runaway paste.
+        const description = (newDesc.trim() || 'Custom').slice(0, 32)
+
         setPorts([...ports, {
             port: portNum,
             label: portNum.toString(),
-            description: newDesc || 'Custom'
+            description,
         }])
         setNewPort('')
         setNewDesc('')
@@ -259,6 +263,7 @@ export function SettingsPanel({
                                 onKeyDown={handleAddKeyDown}
                                 className="input-field flex-1 text-sm py-2"
                                 aria-label="Port description"
+                                maxLength={32}
                             />
                             <button
                                 onClick={addPort}
