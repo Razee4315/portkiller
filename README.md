@@ -79,9 +79,12 @@ macOS and Linux support is not planned (Windows-specific utility).
 | `↑/↓` or `j/k` | Navigate list |
 | `Enter` | Kill selected process (twice to confirm) |
 | `p` | Pin/unpin selected port |
+| `h` | Open kill history |
 | `Ctrl+C` | Copy selected `port:pid` |
 | `Ctrl+A` | Select all visible ports |
+| `Space` | Toggle multi-select on focused row |
 | `Ctrl+Click` | Multi-select |
+| `F5` / `Ctrl+R` | Refresh port list |
 | `Esc` | Clear search / cancel / hide window |
 | `/` | Focus search |
 | `?` | Keyboard cheatsheet |
