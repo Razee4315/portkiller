@@ -349,11 +349,6 @@ fn restart_as_admin(app_handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn hide_main_window(window: WebviewWindow) {
-    let _ = window.hide();
-}
-
-#[tauri::command]
 fn set_tray_tooltip(app: AppHandle, text: String) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_tooltip(Some(text)).map_err(|e| e.to_string())?;
@@ -479,7 +474,6 @@ fn main() {
             open_task_manager,
             kill_process,
             restart_as_admin,
-            hide_main_window,
             set_tray_tooltip
         ])
         .run(tauri::generate_context!())

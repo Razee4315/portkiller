@@ -4,11 +4,13 @@ import { invoke } from '@tauri-apps/api/core'
 import { open as openShell } from '@tauri-apps/plugin-shell'
 import type { PortInfo, ProcessDetails } from '../types'
 import { Icons } from './Icons'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 interface DetailsPanelProps {
     port: PortInfo
     onClose: () => void
     onKill: (port: PortInfo) => void
+    onCopy?: (label: string) => void
 }
 
 // Fixed formatBytes: clamp index and add TB unit (fixes #15)
@@ -19,7 +21,7 @@ function formatBytes(bytes: number): string {
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
 }
 
-export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.Element {
+export function DetailsPanel({ port, onClose, onKill, onCopy }: DetailsPanelProps): JSX.Element {
     const [details, setDetails] = useState<ProcessDetails | null>(null)
     const [loading, setLoading] = useState(true)
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -55,53 +57,24 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
         }
     }, [port.pid])
 
-    // Focus trap for modal accessibility, plus return focus to the previously
-    // focused element when the modal closes.
-    useEffect(() => {
-        const modal = modalRef.current
-        if (!modal) return
-
-        const previouslyFocused = document.activeElement as HTMLElement | null
-
-        const focusableSelector = 'button, [tabindex]:not([tabindex="-1"])'
-        const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
-
-        const handleTab = (e: KeyboardEvent) => {
-            if (e.key !== 'Tab') return
-            const focusable = getFocusable()
-            if (focusable.length === 0) return
-
-            const first = focusable[0]
-            const last = focusable[focusable.length - 1]
-
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault()
-                last.focus()
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault()
-                first.focus()
-            }
-        }
-
-        document.addEventListener('keydown', handleTab)
-        const focusable = getFocusable()
-        if (focusable.length > 0) focusable[0].focus()
-
-        return () => {
-            document.removeEventListener('keydown', handleTab)
-            // Best-effort focus restore — the trigger may have unmounted.
-            if (previouslyFocused && document.body.contains(previouslyFocused)) {
-                previouslyFocused.focus()
-            }
-        }
-    }, [loading])
+    // Re-run focus trap once the loading skeleton swaps for the real content
+    // so newly-rendered buttons are reachable from the start.
+    useFocusTrap(modalRef, [loading])
 
     const openFolder = async () => {
-        if (port.process_path) {
-            try {
-                const folder = port.process_path.substring(0, port.process_path.lastIndexOf('\\'))
-                await openShell(folder)
-            } catch { }
+        if (!port.process_path) return
+        // Support both Windows backslashes and forward slashes (the path comes
+        // from sysinfo which preserves the OS-native separator).
+        const lastSep = Math.max(
+            port.process_path.lastIndexOf('\\'),
+            port.process_path.lastIndexOf('/'),
+        )
+        if (lastSep <= 0) return
+        const folder = port.process_path.substring(0, lastSep)
+        try {
+            await openShell(folder)
+        } catch {
+            // Best-effort — the shell plugin may reject paths outside its scope.
         }
     }
 
@@ -120,8 +93,11 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
 
     const isHttpish = port.protocol.toUpperCase() === 'TCP'
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text)
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => onCopy?.(label),
+            () => {/* permissions / focus quirk; let it fail silently */ },
+        )
     }
 
     return (
@@ -167,7 +143,7 @@ export function DetailsPanel({ port, onClose, onKill }: DetailsPanelProps): JSX.
                                     <div className="flex items-center gap-2">
                                         <span className="text-white font-mono text-sm">{port.pid}</span>
                                         <button
-                                            onClick={() => copyToClipboard(port.pid.toString())}
+                                            onClick={() => copyToClipboard(port.pid.toString(), `PID ${port.pid}`)}
                                             className="text-gray-500 hover:text-white p-0.5 rounded focus:outline-none focus:ring-1 focus:ring-accent-blue/40"
                                             title="Copy PID"
                                             aria-label="Copy PID to clipboard"

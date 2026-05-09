@@ -15,11 +15,22 @@ interface ContextMenuProps {
     onShowDetails: (port: PortInfo) => void
     onTogglePin?: (port: number) => void
     onSelectAllByPid?: (pid: number) => void
+    onCopy?: (label: string) => void
 }
 
-export function ContextMenu({ x, y, port, isPinned, siblingPortCount = 0, onClose, onKill, onShowDetails, onTogglePin, onSelectAllByPid }: ContextMenuProps): JSX.Element {
+export function ContextMenu({ x, y, port, isPinned, siblingPortCount = 0, onClose, onKill, onShowDetails, onTogglePin, onSelectAllByPid, onCopy }: ContextMenuProps): JSX.Element {
     const ref = useRef<HTMLDivElement>(null)
     const [focusedIndex, setFocusedIndex] = useState(0)
+
+    // Wrap a clipboard write so the user gets a toast instead of a silent
+    // copy that "did nothing happen?" Most context-menu actions hand off to
+    // the parent's onCopy handler.
+    const copy = (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => onCopy?.(label),
+            () => {/* permissions / focus quirk; let it fail silently */ },
+        )
+    }
 
     // Build menu items list for keyboard navigation
     const menuItems: { label: string; action: () => void; icon: JSX.Element; className?: string }[] = [
@@ -72,22 +83,22 @@ export function ContextMenu({ x, y, port, isPinned, siblingPortCount = 0, onClos
     menuItems.push(
         {
             label: 'Copy Port',
-            action: () => { navigator.clipboard.writeText(port.port.toString()); onClose() },
+            action: () => { copy(port.port.toString(), `port ${port.port}`); onClose() },
             icon: <Icons.Copy className="w-4 h-4" />,
         },
         {
             label: 'Copy PID',
-            action: () => { navigator.clipboard.writeText(port.pid.toString()); onClose() },
+            action: () => { copy(port.pid.toString(), `PID ${port.pid}`); onClose() },
             icon: <Icons.Copy className="w-4 h-4" />,
         },
         {
             label: 'Copy taskkill command',
-            action: () => { navigator.clipboard.writeText(`taskkill /F /PID ${port.pid}`); onClose() },
+            action: () => { copy(`taskkill /F /PID ${port.pid}`, 'taskkill command'); onClose() },
             icon: <Icons.Copy className="w-4 h-4" />,
         },
         {
             label: 'Copy PowerShell kill',
-            action: () => { navigator.clipboard.writeText(`Stop-Process -Id ${port.pid} -Force`); onClose() },
+            action: () => { copy(`Stop-Process -Id ${port.pid} -Force`, 'PowerShell kill command'); onClose() },
             icon: <Icons.Copy className="w-4 h-4" />,
         },
     )

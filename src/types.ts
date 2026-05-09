@@ -46,9 +46,24 @@ const CUSTOM_PORTS_KEY = 'portkiller_custom_ports';
 export function loadCustomPorts(): CommonPort[] {
   try {
     const stored = localStorage.getItem(CUSTOM_PORTS_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    // Defensive validation — corrupted localStorage shouldn't crash the app
+    // or let stray fields slip into the UI. Cap description length to match
+    // the SettingsPanel input.
+    return parsed
+      .filter((p): p is CommonPort =>
+        typeof p === 'object' && p !== null &&
+        typeof p.port === 'number' && p.port >= 1 && p.port <= 65535 &&
+        typeof p.label === 'string' &&
+        typeof p.description === 'string',
+      )
+      .map(p => ({
+        port: p.port,
+        label: String(p.label).slice(0, 16),
+        description: String(p.description).slice(0, 32),
+      }));
   } catch { }
   return [];
 }
@@ -113,7 +128,16 @@ export function loadKillHistory(): KillRecord[] {
     const raw = localStorage.getItem(KILL_HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.slice(0, KILL_HISTORY_MAX);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((r): r is KillRecord =>
+        typeof r === 'object' && r !== null &&
+        typeof r.port === 'number' &&
+        typeof r.pid === 'number' &&
+        typeof r.processName === 'string' &&
+        typeof r.timestamp === 'number',
+      )
+      .slice(0, KILL_HISTORY_MAX);
   } catch { }
   return [];
 }

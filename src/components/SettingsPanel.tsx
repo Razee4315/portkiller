@@ -1,10 +1,11 @@
 import type { JSX } from 'preact'
-import { useState, useEffect, useRef } from 'preact/hooks'
+import { useState, useRef } from 'preact/hooks'
 import type { CommonPort } from '../types'
 import { COMMON_PORTS } from '../types'
 import type { Preferences } from '../preferences'
 import { POLL_OPTIONS } from '../preferences'
 import { Icons } from './Icons'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 interface SettingsPanelProps {
     customPorts: CommonPort[]
@@ -28,54 +29,21 @@ export function SettingsPanel({
     const [newDesc, setNewDesc] = useState('')
     const modalRef = useRef<HTMLDivElement>(null)
 
-    // Focus trap + return focus to the trigger when closed.
-    useEffect(() => {
-        const modal = modalRef.current
-        if (!modal) return
-
-        const previouslyFocused = document.activeElement as HTMLElement | null
-
-        const focusableSelector = 'button, input, select, [tabindex]:not([tabindex="-1"])'
-        const getFocusable = () => modal.querySelectorAll<HTMLElement>(focusableSelector)
-
-        const handleTab = (e: KeyboardEvent) => {
-            if (e.key !== 'Tab') return
-            const focusable = getFocusable()
-            if (focusable.length === 0) return
-
-            const first = focusable[0]
-            const last = focusable[focusable.length - 1]
-
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault()
-                last.focus()
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault()
-                first.focus()
-            }
-        }
-
-        document.addEventListener('keydown', handleTab)
-        const focusable = getFocusable()
-        if (focusable.length > 0) focusable[0].focus()
-
-        return () => {
-            document.removeEventListener('keydown', handleTab)
-            if (previouslyFocused && document.body.contains(previouslyFocused)) {
-                previouslyFocused.focus()
-            }
-        }
-    }, [])
+    useFocusTrap(modalRef)
 
     const addPort = () => {
         const portNum = parseInt(newPort, 10)
         if (isNaN(portNum) || portNum < 1 || portNum > 65535) return
         if (ports.some(p => p.port === portNum)) return
 
+        // Cap description length to keep the layout tight and prevent
+        // accidental localStorage bloat from a runaway paste.
+        const description = (newDesc.trim() || 'Custom').slice(0, 32)
+
         setPorts([...ports, {
             port: portNum,
             label: portNum.toString(),
-            description: newDesc || 'Custom'
+            description,
         }])
         setNewPort('')
         setNewDesc('')
@@ -259,6 +227,7 @@ export function SettingsPanel({
                                 onKeyDown={handleAddKeyDown}
                                 className="input-field flex-1 text-sm py-2"
                                 aria-label="Port description"
+                                maxLength={32}
                             />
                             <button
                                 onClick={addPort}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
+import { getCurrentWindow, LogicalPosition, LogicalSize, availableMonitors } from '@tauri-apps/api/window'
 
 // In v2 there's no global `appWindow` singleton — each component grabs the
 // current window via getCurrentWindow(). One module-level call keeps things
@@ -305,6 +305,23 @@ export function App() {
     if (saved) {
       ;(async () => {
         try {
+          // Validate that the saved window rect intersects an existing monitor.
+          // Without this, unplugging an external display strands the window
+          // off-screen and the user can't drag it back.
+          const monitors = await availableMonitors().catch(() => [])
+          const visible = monitors.length === 0 || monitors.some(m => {
+            const factor = m.scaleFactor || 1
+            const mx = m.position.x / factor
+            const my = m.position.y / factor
+            const mw = m.size.width / factor
+            const mh = m.size.height / factor
+            // Require at least 100x60 logical px of overlap so the title bar
+            // is reachable for dragging.
+            const overlapX = Math.min(saved.x + saved.width, mx + mw) - Math.max(saved.x, mx)
+            const overlapY = Math.min(saved.y + saved.height, my + mh) - Math.max(saved.y, my)
+            return overlapX >= 100 && overlapY >= 60
+          })
+          if (!visible) return
           await appWindow.setSize(new LogicalSize(saved.width, saved.height))
           await appWindow.setPosition(new LogicalPosition(saved.x, saved.y))
         } catch {
@@ -402,6 +419,24 @@ export function App() {
   }, [state?.ports])
 
   useEffect(() => { filteredPortsRef.current = filteredPorts }, [filteredPorts])
+
+  // Drop selections for ports that have left the list (process exited or
+  // filtered out). Without this, the bulk-kill button keeps an inflated count
+  // and can confirm a kill against rows the user can no longer see.
+  useEffect(() => {
+    if (selectedPorts.size === 0) return
+    const live = new Set(state?.ports.map(p => `${p.port}-${p.pid}`) ?? [])
+    let changed = false
+    const next = new Set<string>()
+    selectedPorts.forEach(key => {
+      if (live.has(key)) next.add(key)
+      else changed = true
+    })
+    if (changed) {
+      setSelectedPorts(next)
+      if (next.size === 0) setPendingBulkKill(false)
+    }
+  }, [state?.ports])
 
   const portMap = useMemo(() => {
     const map = new Map<number, PortInfo>()
@@ -572,11 +607,19 @@ export function App() {
         setSelectedPorts(new Set(ports.map(p => `${p.port}-${p.pid}`)))
         return
       }
+
+      // F5 or Ctrl+R — manual refresh, mirroring the in-search "refresh" command.
+      // We stop the browser from reloading the webview, which would lose state.
+      if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+        e.preventDefault()
+        fetchPorts()
+        return
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast, setPendingBulkKill])
+  }, [selectedIndex, contextMenu, detailsPort, showSettings, showShortcuts, showHistory, pendingKill, pendingBulkKill, searchQuery, selectedPorts, togglePin, showToast, setPendingBulkKill, fetchPorts])
 
   useEffect(() => {
     if (selectedIndex >= 0 && listRef.current) {
@@ -1113,6 +1156,19 @@ export function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => fetchPorts()}
+              disabled={loading}
+              className="text-gray-400 hover:text-white text-[11px] transition-colors px-1.5 py-0.5 rounded hover:bg-dark-700 focus:outline-none focus:ring-1 focus:ring-accent-blue/40 disabled:opacity-50 disabled:cursor-wait flex items-center gap-1"
+              title="Refresh now (F5)"
+              aria-label="Refresh listening ports"
+            >
+              {loading ? (
+                <Icons.Spinner className="w-3 h-3 animate-spin" />
+              ) : (
+                <Icons.Refresh className="w-3 h-3" />
+              )}
+            </button>
             <select
               value={sortMode}
               onChange={(e) => updatePreferences({ sortMode: (e.target as HTMLSelectElement).value as Preferences['sortMode'] })}
@@ -1253,6 +1309,7 @@ export function App() {
           port={detailsPort}
           onClose={() => setDetailsPort(null)}
           onKill={requestKill}
+          onCopy={(label) => showToast(`Copied ${label}`, 'success')}
         />
       )}
 
@@ -1268,6 +1325,7 @@ export function App() {
           onShowDetails={setDetailsPort}
           onTogglePin={togglePin}
           onSelectAllByPid={selectAllByPid}
+          onCopy={(label) => showToast(`Copied ${label}`, 'success')}
         />
       )}
 
