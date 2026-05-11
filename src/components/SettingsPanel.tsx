@@ -180,6 +180,7 @@ export function SettingsPanel({
                             <button
                                 onClick={resetToDefault}
                                 className="text-xs text-gray-400 hover:text-white focus:outline-none focus:text-white"
+                                title="Applies after you press Save Changes"
                             >
                                 Reset to Default
                             </button>

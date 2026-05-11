@@ -68,7 +68,8 @@ export function ContextMenu({ x, y, port, isPinned, siblingPortCount = 0, onClos
 
     // Any TCP port may be reachable via http://localhost — let the user decide.
     if (port.protocol.toUpperCase() === 'TCP') {
-        const scheme = port.port === 443 ? 'https' : 'http'
+        const httpsPorts = new Set([443, 4443, 5443, 8443])
+        const scheme = httpsPorts.has(port.port) ? 'https' : 'http'
         const url = `${scheme}://localhost:${port.port}`
         menuItems.push({
             label: `Open ${url}`,

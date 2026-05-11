@@ -195,6 +195,18 @@ export function App() {
         prevPorts.forEach((_, key) => {
           if (!currentKeys.has(key)) {
             newChanges.set(key, 'removed')
+            // Schedule cleanup so 'removed' entries don't pile up in the Map
+            // forever. The visual highlight is only meaningful for a few seconds.
+            const timer = setTimeout(() => {
+              changeTimersRef.current.delete(timer)
+              setPortChanges(prev => {
+                if (!prev.has(key)) return prev
+                const next = new Map(prev)
+                next.delete(key)
+                return next
+              })
+            }, 3000)
+            changeTimersRef.current.add(timer)
           }
         })
 

@@ -10,7 +10,9 @@ export default defineConfig({
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
+    // Tauri WebView2 on Windows is always Edge/Chromium ≥110. Targeting
+    // older browsers just forces unnecessary transpilation and bloats the bundle.
+    target: 'chrome110',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
   },
