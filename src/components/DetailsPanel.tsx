@@ -87,7 +87,9 @@ export function DetailsPanel({ port, onClose, onKill, onCopy }: DetailsPanelProp
     }
 
     const openInBrowser = async () => {
-        const scheme = port.port === 443 ? 'https' : 'http'
+        // Common HTTPS dev ports beyond 443 — Vite --https, Next dev HTTPS, etc.
+        const httpsPorts = new Set([443, 4443, 5443, 8443])
+        const scheme = httpsPorts.has(port.port) ? 'https' : 'http'
         try { await openShell(`${scheme}://localhost:${port.port}`) } catch { /* noop */ }
     }
 

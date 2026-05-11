@@ -17,8 +17,10 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
+use windows::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 use windows::Win32::System::Threading::{
-    CreateMutexW, OpenProcess, TerminateProcess, PROCESS_TERMINATE,
+    CreateMutexW, GetCurrentProcess, OpenProcess, OpenProcessToken, TerminateProcess,
+    PROCESS_TERMINATE,
 };
 
 // Reusable sysinfo instance — creating a fresh System on every poll is the
@@ -101,16 +103,28 @@ fn get_process_info(system: &System, pid: u32) -> (String, String) {
     }
 }
 
+// Detect process elevation via the Win32 token API. Avoids the ~100 ms cost of
+// shelling `net session` on the critical startup path.
 fn is_running_as_admin() -> bool {
-    use std::process::Command;
-    let output = Command::new("net")
-        .args(["session"])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output();
+    unsafe {
+        let mut token: HANDLE = HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return false;
+        }
 
-    match output {
-        Ok(o) => o.status.success(),
-        Err(_) => false,
+        let mut elevation = TOKEN_ELEVATION::default();
+        let size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+        let mut returned = 0u32;
+        let result = GetTokenInformation(
+            token,
+            TokenElevation,
+            Some(&mut elevation as *mut _ as *mut _),
+            size,
+            &mut returned,
+        );
+        let _ = CloseHandle(token);
+
+        result.is_ok() && elevation.TokenIsElevated != 0
     }
 }
 
@@ -138,11 +152,17 @@ fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
                 if tcp.state != netstat2::TcpState::Listen {
                     continue;
                 }
-                ("TCP".to_string(), tcp.local_port, tcp.local_addr.to_string())
+                (
+                    "TCP".to_string(),
+                    tcp.local_port,
+                    tcp.local_addr.to_string(),
+                )
             }
-            ProtocolSocketInfo::Udp(udp) => {
-                ("UDP".to_string(), udp.local_port, udp.local_addr.to_string())
-            }
+            ProtocolSocketInfo::Udp(udp) => (
+                "UDP".to_string(),
+                udp.local_port,
+                udp.local_addr.to_string(),
+            ),
         };
 
         for pid in &socket.associated_pids {
@@ -187,9 +207,12 @@ fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails,
         .system
         .lock()
         .map_err(|_| "system mutex poisoned".to_string())?;
-    system.refresh_processes(ProcessesToUpdate::All);
-
     let sys_pid = Pid::from_u32(pid);
+    // Only refresh the target PID — refreshing every process on the machine
+    // every 3 s while the details panel is open is wasteful. The main poll
+    // (`get_listening_ports`) keeps the rest of the snapshot fresh enough for
+    // the children-discovery scan below.
+    system.refresh_processes(ProcessesToUpdate::Some(&[sys_pid]));
 
     if let Some(process) = system.process(sys_pid) {
         let name = process.name().to_string_lossy().to_string();
@@ -415,8 +438,8 @@ fn main() {
     };
 
     let alt_p = Shortcut::new(Some(Modifiers::ALT), Code::KeyP);
-    let alt_p_for_handler = alt_p.clone();
-    let alt_p_for_setup = alt_p.clone();
+    let alt_p_for_handler = alt_p;
+    let alt_p_for_setup = alt_p;
 
     tauri::Builder::default()
         .manage(app_data)
@@ -432,7 +455,7 @@ fn main() {
         )
         .setup(move |app| {
             // Register Alt+P globally
-            app.global_shortcut().register(alt_p_for_setup.clone())?;
+            app.global_shortcut().register(alt_p_for_setup)?;
 
             // Build tray menu
             let show_item = MenuItem::with_id(app, "show", "Show (Alt+P)", true, None::<&str>)?;

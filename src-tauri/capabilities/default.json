@@ -20,7 +20,6 @@
     "core:window:allow-is-visible",
     "core:window:allow-is-focused",
     "core:window:allow-start-dragging",
-    "core:webview:allow-internal-toggle-devtools",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "shell:allow-open"
