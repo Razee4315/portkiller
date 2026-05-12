@@ -187,7 +187,7 @@ fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
         }
     }
 
-    ports.sort_by(|a, b| a.port.cmp(&b.port));
+    ports.sort_by_key(|p| p.port);
 
     let last_updated = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
