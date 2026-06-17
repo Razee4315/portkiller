@@ -454,6 +454,16 @@ fn main() {
                 .build(),
         )
         .setup(move |app| {
+            // Auto-updater (reads a signed latest.json from GitHub Releases) and
+            // the process plugin (relaunch after install). Desktop-only plugins,
+            // so registered here behind cfg rather than in the chain above.
+            #[cfg(desktop)]
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
+
             // Register Alt+P globally
             app.global_shortcut().register(alt_p_for_setup)?;
 

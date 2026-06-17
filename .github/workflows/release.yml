@@ -47,6 +47,38 @@ jobs:
           npm version "$VERSION" --no-git-tag-version
           echo "Updated version to $VERSION"
 
+      # Build the release body from the top CHANGELOG section so the updater's
+      # in-app "What's new" popup shows the actual changes. The dialog strips the
+      # Installation/Requirements block below; the GitHub release page keeps it.
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          # Lines of the first "## [...]" section, excluding the two heading
+          # lines that bound it.
+          CHANGES=$(awk '/^## \[/{c++; next} c==1' CHANGELOG.md)
+          if [ -z "$(echo "$CHANGES" | tr -d '[:space:]')" ]; then
+            CHANGES="A new version of PortKiller is available."
+          fi
+          {
+            echo "notes<<__PK_NOTES__"
+            echo "## What's new in v$VERSION"
+            echo ""
+            printf '%s\n' "$CHANGES"
+            echo ""
+            echo "### Installation"
+            echo "- **\`.exe\`** — NSIS installer (recommended)"
+            echo "- **\`.msi\`** — Standard Windows installer"
+            echo ""
+            echo "### Requirements"
+            echo "- Windows 10/11 (x64)"
+            echo "- WebView2 Runtime (auto-installed)"
+            echo ""
+            echo "See the [CHANGELOG](https://github.com/Razee4315/portkiller/blob/main/CHANGELOG.md) for the full history."
+            echo "__PK_NOTES__"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -68,27 +100,19 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater artifact signing — the matching pubkey lives in
+          # tauri.conf.json. With createUpdaterArtifacts enabled the build FAILS
+          # if this secret is missing, so it must stay set on the repo.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # The signing key was generated without a password; GitHub refuses
+          # empty-valued secrets, so the empty password is set inline here.
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tauriScript: npx tauri
           tagName: v__VERSION__
           releaseName: 'PortKiller v__VERSION__'
-          releaseBody: |
-            ## PortKiller v__VERSION__
-
-            Download the installer below to get started.
-
-            ### Installation
-            - **`.msi`** — Standard Windows installer
-            - **`.exe`** — NSIS installer (recommended)
-
-            ### Requirements
-            - Windows 10/11 (x64)
-            - WebView2 Runtime (auto-installed)
-
-            ### Quick Start
-            1. Download and run the installer
-            2. Press `Alt+P` to show the overlay
-            3. Type port number and press `Enter` to kill
-            4. Press `Esc` to hide
+          releaseBody: ${{ steps.notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
+          # Emit latest.json (the updater manifest) alongside the installers.
+          includeUpdaterJson: true

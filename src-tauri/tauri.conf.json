@@ -40,6 +40,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "category": "DeveloperTool",
     "copyright": "",
     "shortDescription": "Port Process Killer Utility",
@@ -82,6 +83,12 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFDOUI3NzRCQTg2OUUzQ0EKUldUSzQybW9TM2ViSEs3QTNwS0N1ZkJWMnpDd0ozWW5mS09pTHF6VlQ0dTk1UDBLVUxCdGRBMFUK",
+      "endpoints": [
+        "https://github.com/Razee4315/portkiller/releases/latest/download/latest.json"
+      ]
     }
   }
 }

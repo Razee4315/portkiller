@@ -151,3 +151,16 @@ export function appendKillHistory(record: KillRecord, current: KillRecord[]): Ki
 export function clearKillHistory(): void {
   try { localStorage.removeItem(KILL_HISTORY_KEY); } catch { }
 }
+
+// Auto-updater — remember a version the user chose to "Skip" so the update
+// dialog doesn't nag for that release on every launch. "Later" is not persisted
+// (it just dismisses until the next start).
+const SKIPPED_UPDATE_KEY = 'portkiller_skipped_update_v1';
+
+export function getSkippedUpdateVersion(): string | null {
+  try { return localStorage.getItem(SKIPPED_UPDATE_KEY); } catch { return null; }
+}
+
+export function setSkippedUpdateVersion(version: string): void {
+  try { localStorage.setItem(SKIPPED_UPDATE_KEY, version); } catch { }
+}
