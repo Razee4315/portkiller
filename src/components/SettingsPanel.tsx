@@ -13,6 +13,9 @@ interface SettingsPanelProps {
     onUpdatePreferences: (next: Partial<Preferences>) => void
     onSave: (ports: CommonPort[]) => void
     onClose: () => void
+    appVersion: string
+    onCheckForUpdates: () => void
+    checkingForUpdates: boolean
 }
 
 export function SettingsPanel({
@@ -21,6 +24,9 @@ export function SettingsPanel({
     onUpdatePreferences,
     onSave,
     onClose,
+    appVersion,
+    onCheckForUpdates,
+    checkingForUpdates,
 }: SettingsPanelProps): JSX.Element {
     const [ports, setPorts] = useState<CommonPort[]>(
         customPorts.length > 0 ? customPorts : [...COMMON_PORTS]
@@ -236,6 +242,27 @@ export function SettingsPanel({
                                 className="btn btn-ghost px-3 disabled:opacity-50"
                             >
                                 Add
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="border-t border-dark-500 pt-4">
+                        <span className="text-gray-300 text-sm font-medium block mb-2">Updates</span>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <div className="text-white text-sm">
+                                    PortKiller{appVersion ? ` v${appVersion}` : ''}
+                                </div>
+                                <div className="text-gray-400 text-xs">
+                                    Updates install automatically when found at launch.
+                                </div>
+                            </div>
+                            <button
+                                onClick={onCheckForUpdates}
+                                disabled={checkingForUpdates}
+                                className="btn btn-ghost px-3 disabled:opacity-50 whitespace-nowrap"
+                            >
+                                {checkingForUpdates ? 'Checking…' : 'Check for updates'}
                             </button>
                         </div>
                     </section>

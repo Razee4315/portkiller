@@ -35,6 +35,9 @@ import { ContextMenu } from './components/ContextMenu'
 import { SettingsPanel } from './components/SettingsPanel'
 import { ShortcutsPanel } from './components/ShortcutsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
+import { UpdateDialog } from './components/UpdateDialog'
+import { useUpdater } from './hooks/useUpdater'
+import { getVersion } from '@tauri-apps/api/app'
 
 // Fuzzy search scoring
 function fuzzyScore(query: string, target: string): number {
@@ -109,6 +112,7 @@ export function App() {
   const [pinnedPorts, setPinnedPorts] = useState<Set<number>>(() => new Set(loadPinnedPorts()))
   const [killHistory, setKillHistory] = useState<KillRecord[]>(() => loadKillHistory())
   const [showHistory, setShowHistory] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
   const protocolFilter = preferences.protocolFilter
   const sortMode = preferences.sortMode
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now())
@@ -470,6 +474,16 @@ export function App() {
       setToast(null)
       toastTimerRef.current = null
     }, duration)
+  }, [])
+
+  // Auto-updater: checks GitHub Releases on launch and drives the UpdateDialog.
+  // The Settings panel reuses `checkNow` for its manual "Check for updates".
+  const updater = useUpdater(showToast)
+
+  // App version for the Settings "About" line. Read once; failure (e.g. a
+  // browser dev preview) just leaves it blank.
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {})
   }, [])
 
   const togglePin = useCallback((portNumber: number) => {
@@ -1360,12 +1374,19 @@ export function App() {
             setShowSettings(false)
           }}
           onClose={() => setShowSettings(false)}
+          appVersion={appVersion}
+          onCheckForUpdates={updater.checkNow}
+          checkingForUpdates={updater.checking}
         />
       )}
 
       {showShortcuts && (
         <ShortcutsPanel onClose={() => setShowShortcuts(false)} />
       )}
+
+      {/* Startup update check; renders nothing unless an update is available
+          or a download/install is in flight. */}
+      <UpdateDialog {...updater} />
     </div>
   )
 }
