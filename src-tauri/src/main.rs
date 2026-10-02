@@ -4,39 +4,57 @@
 )]
 
 use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::os::windows::process::CommandExt;
+use std::process::Command;
 use std::sync::Mutex;
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, State, WebviewWindow,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use windows::core::PCWSTR;
-use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use windows::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED, ERROR_INVALID_PARAMETER, HANDLE};
 use windows::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 use windows::Win32::System::Threading::{
-    CreateMutexW, GetCurrentProcess, OpenProcess, OpenProcessToken, TerminateProcess,
-    PROCESS_TERMINATE,
+    GetCurrentProcess, OpenProcess, OpenProcessToken, TerminateProcess, PROCESS_TERMINATE,
 };
+
+// Hide the console window of helper processes (taskkill, reg, powershell).
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+// Passed by the "start with Windows" registry entry so a login launch stays in
+// the tray instead of popping the window open.
+const HIDDEN_FLAG: &str = "--hidden";
+
+// Passed to the elevated instance spawned by `restart_as_admin`. It waits a
+// moment before starting so the unelevated instance has released the
+// single-instance lock and the global hotkey.
+const RELAUNCH_FLAG: &str = "--relaunch";
+
+const DEFAULT_HOTKEY: &str = "Alt+P";
+
+const AUTOSTART_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+const AUTOSTART_VALUE: &str = "PortKiller";
 
 // Reusable sysinfo instance — creating a fresh System on every poll is the
 // single biggest CPU cost in the old code path.
 struct AppData {
     system: Mutex<System>,
     is_admin: bool,
+    start_hidden: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct PortInfo {
     pub pid: u32,
     pub port: u16,
     pub protocol: String,
     pub process_name: String,
     pub process_path: String,
+    pub command_line: String,
     pub is_protected: bool,
     pub local_address: String,
 }
@@ -44,15 +62,27 @@ pub struct PortInfo {
 #[derive(Serialize, Clone)]
 pub struct AppState {
     pub ports: Vec<PortInfo>,
-    pub last_updated: u64,
     pub is_admin: bool,
+}
+
+// Machine-readable kill outcome. The frontend owns the wording, so nothing
+// here depends on the (localized) text that Windows tools print.
+#[derive(Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum KillCode {
+    Ok,
+    Protected,
+    Gone,
+    Stale,
+    Denied,
+    Failed,
 }
 
 #[derive(Serialize, Clone)]
 pub struct KillResult {
-    pub success: bool,
-    pub message: String,
-    pub port: u16,
+    pub code: KillCode,
+    pub process_name: String,
+    pub detail: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -89,7 +119,24 @@ fn is_protected_process(pid: u32, name: &str) -> bool {
     PROTECTED_PROCESSES.iter().any(|&p| name_lower == p)
 }
 
-fn get_process_info(system: &System, pid: u32) -> (String, String) {
+// The port list only needs each process's name, path and command line. CPU,
+// memory and disk counters are skipped: they are the expensive part of a full
+// refresh and nothing in the list shows them.
+fn list_refresh_kind() -> ProcessRefreshKind {
+    ProcessRefreshKind::new()
+        .with_exe(UpdateKind::OnlyIfNotSet)
+        .with_cmd(UpdateKind::OnlyIfNotSet)
+}
+
+fn lock_system(data: &AppData) -> std::sync::MutexGuard<'_, System> {
+    // A poisoned lock only means another command panicked mid-refresh; the
+    // process table is still usable.
+    data.system
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn get_process_info(system: &System, pid: u32) -> (String, String, String) {
     let sys_pid = Pid::from_u32(pid);
     if let Some(process) = system.process(sys_pid) {
         let name = process.name().to_string_lossy().to_string();
@@ -97,9 +144,15 @@ fn get_process_info(system: &System, pid: u32) -> (String, String) {
             .exe()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
-        (name, path)
+        let command_line = process
+            .cmd()
+            .iter()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        (name, path, command_line)
     } else {
-        ("Unknown".to_string(), String::new())
+        ("Unknown".to_string(), String::new(), String::new())
     }
 }
 
@@ -128,20 +181,18 @@ fn is_running_as_admin() -> bool {
     }
 }
 
-#[tauri::command]
+// Commands that scan sockets, refresh processes or wait on a helper process
+// are marked `async` so Tauri runs them on its thread pool. Plain commands run
+// on the main thread, where they would stall window dragging and input.
+#[tauri::command(async)]
 fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
     let af_flags = AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6;
     let proto_flags = ProtocolFlags::TCP | ProtocolFlags::UDP;
 
     let sockets = get_sockets_info(af_flags, proto_flags).map_err(|e| e.to_string())?;
 
-    // Refresh process info on the shared System instance. Cheaper than
-    // building a new one per poll.
-    let mut system = data
-        .system
-        .lock()
-        .map_err(|_| "system mutex poisoned".to_string())?;
-    system.refresh_processes(ProcessesToUpdate::All);
+    let mut system = lock_system(&data);
+    system.refresh_processes_specifics(ProcessesToUpdate::All, list_refresh_kind());
 
     let mut ports: Vec<PortInfo> = Vec::new();
     let mut seen: HashSet<(u16, u32)> = HashSet::new();
@@ -167,12 +218,11 @@ fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
 
         for pid in &socket.associated_pids {
             let pid_u32 = *pid;
-            if seen.contains(&(local_port, pid_u32)) {
+            if !seen.insert((local_port, pid_u32)) {
                 continue;
             }
-            seen.insert((local_port, pid_u32));
 
-            let (process_name, process_path) = get_process_info(&system, pid_u32);
+            let (process_name, process_path, command_line) = get_process_info(&system, pid_u32);
             let is_protected = is_protected_process(pid_u32, &process_name);
 
             ports.push(PortInfo {
@@ -181,6 +231,7 @@ fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
                 protocol: protocol.clone(),
                 process_name,
                 process_path,
+                command_line,
                 is_protected,
                 local_address: local_addr.clone(),
             });
@@ -189,30 +240,23 @@ fn get_listening_ports(data: State<AppData>) -> Result<AppState, String> {
 
     ports.sort_by_key(|p| p.port);
 
-    let last_updated = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
     Ok(AppState {
         ports,
-        last_updated,
         is_admin: data.is_admin,
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails, String> {
-    let mut system = data
-        .system
-        .lock()
-        .map_err(|_| "system mutex poisoned".to_string())?;
+    let mut system = lock_system(&data);
     let sys_pid = Pid::from_u32(pid);
-    // Only refresh the target PID — refreshing every process on the machine
-    // every 3 s while the details panel is open is wasteful. The main poll
-    // (`get_listening_ports`) keeps the rest of the snapshot fresh enough for
-    // the children-discovery scan below.
-    system.refresh_processes(ProcessesToUpdate::Some(&[sys_pid]));
+    // Only refresh the target PID, and only the counters this panel shows.
+    // The main poll (`get_listening_ports`) keeps the rest of the snapshot
+    // fresh enough for the children-discovery scan below.
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[sys_pid]),
+        ProcessRefreshKind::new().with_memory().with_cpu(),
+    );
 
     if let Some(process) = system.process(sys_pid) {
         let name = process.name().to_string_lossy().to_string();
@@ -223,7 +267,6 @@ fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails,
         let memory_bytes = process.memory();
         let cpu_percent = process.cpu_usage();
 
-        // Find child processes
         let children: Vec<u32> = system
             .processes()
             .iter()
@@ -249,126 +292,175 @@ fn get_process_details(pid: u32, data: State<AppData>) -> Result<ProcessDetails,
     }
 }
 
-#[tauri::command]
+// Task Manager's manifest asks for elevation, so a direct spawn fails for a
+// standard token. `start` goes through the shell, which shows the UAC prompt.
+#[tauri::command(async)]
 fn open_task_manager() -> Result<(), String> {
-    use std::process::Command;
-
-    Command::new("taskmgr.exe")
-        .creation_flags(0x08000000)
+    Command::new("cmd")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args(["/C", "start", "", "taskmgr.exe"])
         .spawn()
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn kill_process(pid: u32, port: u16, process_name: String) -> KillResult {
+// Open Explorer with the given file selected.
+#[tauri::command(async)]
+fn reveal_in_explorer(path: String) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    if !target.is_absolute() || !target.exists() {
+        return Err("That path no longer exists".to_string());
+    }
+    Command::new("explorer")
+        .args(["/select,", &path])
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+enum TerminateError {
+    Denied,
+    Gone,
+    Other(String),
+}
+
+fn classify_win32(error: &windows::core::Error) -> TerminateError {
+    if error.code() == ERROR_ACCESS_DENIED.to_hresult() {
+        TerminateError::Denied
+    } else if error.code() == ERROR_INVALID_PARAMETER.to_hresult() {
+        // OpenProcess reports an unknown PID as an invalid parameter.
+        TerminateError::Gone
+    } else {
+        TerminateError::Other(error.message())
+    }
+}
+
+fn terminate(pid: u32) -> Result<(), TerminateError> {
+    unsafe {
+        match OpenProcess(PROCESS_TERMINATE, false, pid) {
+            Ok(handle) => {
+                let result = TerminateProcess(handle, 1);
+                let _ = CloseHandle(handle);
+                result.map_err(|e| classify_win32(&e))
+            }
+            Err(e) => Err(classify_win32(&e)),
+        }
+    }
+}
+
+// taskkill reaches some service processes that a plain TerminateProcess
+// cannot, and `/T` takes the whole process tree down with the parent.
+fn taskkill(pid: u32, tree: bool) -> Result<(), TerminateError> {
+    let mut command = Command::new("taskkill");
+    command.creation_flags(CREATE_NO_WINDOW).arg("/F");
+    if tree {
+        command.arg("/T");
+    }
+    command.args(["/PID", &pid.to_string()]);
+
+    match command.output() {
+        Ok(output) if output.status.success() => Ok(()),
+        // Exit codes, not stderr text: the text is localized.
+        Ok(output) => Err(match output.status.code() {
+            Some(128) => TerminateError::Gone,
+            Some(1) => TerminateError::Denied,
+            _ => TerminateError::Other(String::from_utf8_lossy(&output.stderr).trim().to_string()),
+        }),
+        Err(e) => Err(TerminateError::Other(e.to_string())),
+    }
+}
+
+// True when `pid` still holds a socket on `port`. Guards against acting on a
+// stale row: the process may have exited, and Windows reuses PIDs.
+fn pid_owns_port(pid: u32, port: u16) -> bool {
+    let af_flags = AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6;
+    let proto_flags = ProtocolFlags::TCP | ProtocolFlags::UDP;
+
+    match get_sockets_info(af_flags, proto_flags) {
+        Ok(sockets) => sockets.iter().any(|socket| {
+            let local_port = match &socket.protocol_socket_info {
+                ProtocolSocketInfo::Tcp(tcp) => tcp.local_port,
+                ProtocolSocketInfo::Udp(udp) => udp.local_port,
+            };
+            local_port == port && socket.associated_pids.contains(&pid)
+        }),
+        // If the socket table cannot be read, do not block the kill on it.
+        Err(_) => true,
+    }
+}
+
+fn kill_result(code: KillCode, process_name: &str, detail: &str) -> KillResult {
+    KillResult {
+        code,
+        process_name: process_name.to_string(),
+        detail: detail.to_string(),
+    }
+}
+
+#[tauri::command(async)]
+fn kill_process(pid: u32, port: u16, tree: bool, data: State<AppData>) -> KillResult {
+    // Look the process up here rather than trusting what the UI last saw.
+    let sys_pid = Pid::from_u32(pid);
+    let mut system = lock_system(&data);
+    system.refresh_processes_specifics(ProcessesToUpdate::Some(&[sys_pid]), list_refresh_kind());
+    let current_name = system
+        .process(sys_pid)
+        .map(|p| p.name().to_string_lossy().to_string());
+    // Release the lock before the (slow) socket scan and kill below.
+    drop(system);
+
+    let Some(process_name) = current_name else {
+        return kill_result(KillCode::Gone, "", "");
+    };
+
     if is_protected_process(pid, &process_name) {
-        return KillResult {
-            success: false,
-            message: format!("Cannot kill protected system process: {}", process_name),
-            port,
-        };
+        return kill_result(KillCode::Protected, &process_name, "");
     }
 
-    // First try Windows API
-    let api_result = unsafe {
-        let handle: Result<HANDLE, _> = OpenProcess(PROCESS_TERMINATE, false, pid);
+    if !pid_owns_port(pid, port) {
+        return kill_result(KillCode::Stale, &process_name, "");
+    }
 
-        match handle {
-            Ok(h) => {
-                if h.is_invalid() {
-                    false
-                } else {
-                    let result = TerminateProcess(h, 1);
-                    let _ = CloseHandle(h);
-                    result.is_ok()
-                }
-            }
-            Err(_) => false,
+    let outcome = if tree {
+        taskkill(pid, true)
+    } else {
+        match terminate(pid) {
+            Err(TerminateError::Denied) => taskkill(pid, false),
+            other => other,
         }
     };
 
-    if api_result {
-        return KillResult {
-            success: true,
-            message: format!("Port {} freed (killed {})", port, process_name),
-            port,
-        };
-    }
-
-    // Fallback: use taskkill command (works better for services)
-    use std::process::Command;
-    let taskkill_result = Command::new("taskkill")
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .args(["/F", "/PID", &pid.to_string()])
-        .output();
-
-    match taskkill_result {
-        Ok(output) => {
-            if output.status.success() {
-                KillResult {
-                    success: true,
-                    message: format!("Port {} freed (killed {})", port, process_name),
-                    port,
-                }
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                if stderr.contains("Access is denied") || stderr.contains("not found") {
-                    KillResult {
-                        success: false,
-                        message: "Access denied. Restart as Administrator.".to_string(),
-                        port,
-                    }
-                } else {
-                    KillResult {
-                        success: false,
-                        message: format!("Failed to kill process: {}", stderr.trim()),
-                        port,
-                    }
-                }
-            }
-        }
-        Err(e) => KillResult {
-            success: false,
-            message: format!("Failed to execute taskkill: {}", e),
-            port,
-        },
+    match outcome {
+        Ok(()) => kill_result(KillCode::Ok, &process_name, ""),
+        Err(TerminateError::Denied) => kill_result(KillCode::Denied, &process_name, ""),
+        Err(TerminateError::Gone) => kill_result(KillCode::Gone, &process_name, ""),
+        Err(TerminateError::Other(detail)) => kill_result(KillCode::Failed, &process_name, &detail),
     }
 }
 
-#[tauri::command]
+// Relaunch elevated. Blocks until the UAC prompt is answered so that a
+// cancelled prompt leaves this instance running instead of quitting the app.
+#[tauri::command(async)]
 fn restart_as_admin(app_handle: AppHandle) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    use std::process::Command;
-
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let script = format!(
+        "Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs",
+        exe.to_string_lossy().replace('\'', "''"),
+        RELAUNCH_FLAG
+    );
 
-    // Use ShellExecuteW via PowerShell to properly elevate
-    let result = Command::new("powershell")
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW - hide PowerShell window
-        .args([
-            "-WindowStyle",
-            "Hidden",
-            "-Command",
-            &format!(
-                "Start-Process -FilePath '{}' -Verb RunAs",
-                exe.to_string_lossy().replace("'", "''")
-            ),
-        ])
-        .spawn();
+    let status = Command::new("powershell")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
+        .status()
+        .map_err(|e| format!("Could not start PowerShell: {}", e))?;
 
-    match result {
-        Ok(_) => {
-            // Exit current instance after spawning elevated one
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                app_handle.exit(0);
-            });
-            Ok(())
-        }
-        Err(e) => Err(format!("Failed to restart as admin: {}", e)),
+    if !status.success() {
+        return Err("Elevation was cancelled".to_string());
     }
+
+    app_handle.exit(0);
+    Ok(())
 }
 
 #[tauri::command]
@@ -379,81 +471,135 @@ fn set_tray_tooltip(app: AppHandle, text: String) -> Result<(), String> {
     Ok(())
 }
 
+// Called by the frontend once it has rendered and restored the saved window
+// position. Showing the window from here, rather than at creation, avoids a
+// flash of an empty transparent window at the default position.
+#[tauri::command]
+fn frontend_ready(window: WebviewWindow, data: State<AppData>) {
+    if !data.start_hidden {
+        show_window(&window);
+    }
+}
+
+// Replace the global show/hide shortcut. The frontend stores the user's
+// choice and applies it on every start.
+#[tauri::command]
+fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
+    let shortcuts = app.global_shortcut();
+    let _ = shortcuts.unregister_all();
+    shortcuts
+        .register(accelerator.as_str())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+fn get_autostart() -> bool {
+    Command::new("reg")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args(["query", AUTOSTART_KEY, "/v", AUTOSTART_VALUE])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+#[tauri::command(async)]
+fn set_autostart(enabled: bool) -> Result<(), String> {
+    let mut command = Command::new("reg");
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    if enabled {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let value = format!("\"{}\" {}", exe.display(), HIDDEN_FLAG);
+        command.args([
+            "add",
+            AUTOSTART_KEY,
+            "/v",
+            AUTOSTART_VALUE,
+            "/t",
+            "REG_SZ",
+            "/d",
+            &value,
+            "/f",
+        ]);
+    } else {
+        command.args(["delete", AUTOSTART_KEY, "/v", AUTOSTART_VALUE, "/f"]);
+    }
+
+    let output = command.output().map_err(|e| e.to_string())?;
+    // Deleting a value that is already absent fails; that is still "disabled".
+    if output.status.success() || !enabled {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
 fn show_window(window: &WebviewWindow) {
     // Don't re-center on every show — the frontend persists the user's last
-    // position and we want to honor it. center=true in tauri.conf.json still
-    // covers the very first launch.
+    // position and we want to honor it.
+    let _ = window.unminimize();
     let _ = window.show();
     let _ = window.set_focus();
 }
 
+// Hotkey behavior: hide only when the window is already in front. A window
+// that is visible but buried behind other apps is brought forward instead.
 fn toggle_window(window: &WebviewWindow) {
-    if window.is_visible().unwrap_or(false) {
+    let visible = window.is_visible().unwrap_or(false);
+    let focused = window.is_focused().unwrap_or(false);
+    if visible && focused {
         let _ = window.hide();
     } else {
         show_window(window);
     }
 }
 
-fn handle_tray_show(app: &AppHandle) {
+fn handle_show(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         show_window(&w);
     }
 }
 
-fn handle_tray_toggle(app: &AppHandle) {
+fn handle_toggle(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         toggle_window(&w);
     }
 }
 
-// Acquire a single-instance Windows mutex. Returns true if we're the first
-// instance, false if another PortKiller is already running.
-fn acquire_single_instance_lock() -> bool {
-    let name: Vec<u16> = "Global\\PortKiller_SingleInstance_v1\0"
-        .encode_utf16()
-        .collect();
-    unsafe {
-        let handle = CreateMutexW(None, true, PCWSTR(name.as_ptr()));
-        if handle.is_err() {
-            return true; // best-effort: don't block startup if mutex fails
-        }
-        GetLastError() != ERROR_ALREADY_EXISTS
-    }
-}
-
 fn main() {
-    if !acquire_single_instance_lock() {
-        // Another instance is already running. Bail out — Alt+P / tray click
-        // on the original instance is the way to bring it forward.
-        return;
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == RELAUNCH_FLAG) {
+        // Give the unelevated instance time to exit and release the
+        // single-instance lock before this one asks for it.
+        std::thread::sleep(std::time::Duration::from_millis(1500));
     }
 
-    let is_admin = is_running_as_admin();
     let app_data = AppData {
-        system: Mutex::new(System::new_with_specifics(
-            RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
-        )),
-        is_admin,
+        system: Mutex::new(System::new()),
+        is_admin: is_running_as_admin(),
+        start_hidden: args.iter().any(|a| a == HIDDEN_FLAG),
     };
 
-    let alt_p = Shortcut::new(Some(Modifiers::ALT), Code::KeyP);
-    let alt_p_for_handler = alt_p;
-    let alt_p_for_setup = alt_p;
-
     tauri::Builder::default()
+        // Must be the first plugin. A second launch exits immediately and
+        // this callback runs in the instance that is already open.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            handle_show(app);
+        }))
         .manage(app_data)
         .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, event| {
-                    if shortcut == &alt_p_for_handler && event.state == ShortcutState::Pressed {
-                        handle_tray_toggle(app);
+                .with_handler(|app, _shortcut, event| {
+                    // Only one shortcut is ever registered, so any press is
+                    // the show/hide hotkey.
+                    if event.state == ShortcutState::Pressed {
+                        handle_toggle(app);
                     }
                 })
                 .build(),
         )
-        .setup(move |app| {
+        .setup(|app| {
             // Auto-updater (reads a signed latest.json from GitHub Releases) and
             // the process plugin (relaunch after install). Desktop-only plugins,
             // so registered here behind cfg rather than in the chain above.
@@ -464,11 +610,12 @@ fn main() {
                 app.handle().plugin(tauri_plugin_process::init())?;
             }
 
-            // Register Alt+P globally
-            app.global_shortcut().register(alt_p_for_setup)?;
+            // Best-effort default hotkey. Another app may already own it; that
+            // must not stop PortKiller from starting. The frontend re-applies
+            // the user's saved shortcut and reports a failure in the UI.
+            let _ = app.global_shortcut().register(DEFAULT_HOTKEY);
 
-            // Build tray menu
-            let show_item = MenuItem::with_id(app, "show", "Show (Alt+P)", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "Show PortKiller", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
@@ -483,18 +630,20 @@ fn main() {
                 .tooltip("PortKiller")
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "show" => handle_tray_show(app),
+                    "show" => handle_show(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
+                    // Clicking the tray takes focus away from the window first,
+                    // so "toggle" could never hide it. Always bring it forward.
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
                     } = event
                     {
-                        handle_tray_toggle(tray.app_handle());
+                        handle_show(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -505,9 +654,14 @@ fn main() {
             get_listening_ports,
             get_process_details,
             open_task_manager,
+            reveal_in_explorer,
             kill_process,
             restart_as_admin,
-            set_tray_tooltip
+            set_tray_tooltip,
+            frontend_ready,
+            set_hotkey,
+            get_autostart,
+            set_autostart
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
