@@ -86,7 +86,15 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState('')
   // The cursor is the row the keyboard acts on. It is stored by row identity,
   // not by index, so it stays on the same process when a poll reorders the list.
-  const [cursorKey, setCursorKey] = useState<string | null>(null)
+  const [cursorKey, setCursorKeyState] = useState<string | null>(null)
+  // Mirrors `cursorKey` synchronously. Key handlers read the cursor from here
+  // so that a fast "move, then Enter" always acts on the row just moved to,
+  // even if the move has not been rendered yet.
+  const cursorKeyRef = useRef<string | null>(null)
+  const setCursorKey = useCallback((key: string | null) => {
+    cursorKeyRef.current = key
+    setCursorKeyState(key)
+  }, [])
   // Rows ticked for a bulk kill. Separate from the cursor, and drawn differently.
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(NO_SELECTION)
   const [showSettings, setShowSettings] = useState(false)
@@ -114,13 +122,19 @@ export function App() {
     pinned: pinnedPorts,
   }), [allPorts, searchQuery, preferences.protocolFilter, preferences.sortMode, pinnedPorts])
 
-  const cursorIndex = cursorKey === null ? -1 : filteredPorts.findIndex(p => portKey(p) === cursorKey)
-  const cursorPort = cursorIndex >= 0 ? filteredPorts[cursorIndex] : null
-
   // Event handlers below are created once and read the current view through
   // this ref, so the memoized rows are not re-rendered by handler identity.
-  const view = useRef({ filteredPorts, cursorIndex, cursorPort, allPorts, overlayOpen })
-  view.current = { filteredPorts, cursorIndex, cursorPort, allPorts, overlayOpen }
+  const view = useRef({ filteredPorts, allPorts, overlayOpen })
+  view.current = { filteredPorts, allPorts, overlayOpen }
+
+  /** Index of the cursor row in the visible list, or -1. Always current. */
+  const liveCursorIndex = useCallback(() => {
+    const key = cursorKeyRef.current
+    return key === null ? -1 : view.current.filteredPorts.findIndex(p => portKey(p) === key)
+  }, [])
+  const liveCursorPort = useCallback((): PortInfo | null => {
+    return view.current.filteredPorts[liveCursorIndex()] ?? null
+  }, [liveCursorIndex])
 
   const protocolCounts = useMemo(() => {
     const counts = { all: allPorts.length, tcp: 0, udp: 0 }
@@ -175,7 +189,7 @@ export function App() {
   const changeSearch = useCallback((value: string) => {
     setSearchQuery(value)
     setCursorKey(null)
-  }, [])
+  }, [setCursorKey])
 
   const focusSearch = useCallback(() => {
     searchRef.current?.focus()
@@ -401,9 +415,9 @@ export function App() {
   }
 
   const moveCursor = useCallback((delta: 1 | -1) => {
-    const { filteredPorts, cursorIndex } = view.current
+    const { filteredPorts } = view.current
     if (filteredPorts.length === 0) return
-    const nextIndex = cursorIndex + delta
+    const nextIndex = liveCursorIndex() + delta
     if (nextIndex < 0) {
       // Moving up past the first row returns to the search box.
       setCursorKey(null)
@@ -411,18 +425,19 @@ export function App() {
       return
     }
     setCursorKey(portKey(filteredPorts[Math.min(nextIndex, filteredPorts.length - 1)]))
-  }, [])
+  }, [liveCursorIndex, setCursorKey])
 
   const enterList = useCallback(() => {
-    const { filteredPorts, cursorIndex } = view.current
+    const { filteredPorts } = view.current
     if (filteredPorts.length === 0) return
-    if (cursorIndex < 0) setCursorKey(portKey(filteredPorts[0]))
+    if (liveCursorIndex() < 0) setCursorKey(portKey(filteredPorts[0]))
     searchRef.current?.blur()
-  }, [])
+  }, [liveCursorIndex, setCursorKey])
 
   const handlePortClick = useCallback((port: PortInfo, e: MouseEvent) => {
     const key = portKey(port)
-    const { filteredPorts, cursorIndex } = view.current
+    const { filteredPorts } = view.current
+    const cursorIndex = liveCursorIndex()
 
     if (e.ctrlKey || e.metaKey) {
       setSelectedKeys(prev => {
@@ -443,23 +458,26 @@ export function App() {
       changeSelection(NO_SELECTION)
     }
     setCursorKey(key)
-  }, [changeSelection, kill.cancelPending])
+  }, [changeSelection, kill.cancelPending, liveCursorIndex, setCursorKey])
 
   const handleContextMenu = useCallback((port: PortInfo, e: MouseEvent) => {
     e.preventDefault()
     setCursorKey(portKey(port))
     setContextMenu({ x: e.clientX, y: e.clientY, port })
-  }, [])
+  }, [setCursorKey])
 
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
   const toggleCursorSelection = () => {
-    if (!cursorPort) return
-    const key = portKey(cursorPort)
-    const next = new Set(selectedKeys)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
-    changeSelection(next)
+    const key = cursorKeyRef.current
+    if (key === null) return
+    kill.cancelPending()
+    setSelectedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next.size === 0 ? NO_SELECTION : next
+    })
   }
 
   // Escape undoes one thing at a time, innermost first, and only hides the
@@ -489,14 +507,21 @@ export function App() {
   useGlobalKeys({
     searchRef,
     overlayOpen,
-    hasCursor: cursorPort !== null,
+    hasCursor: () => liveCursorPort() !== null,
     onEscape: handleEscape,
     onMoveCursor: moveCursor,
-    onKillCursor: () => { if (cursorPort) kill.requestKill(cursorPort) },
-    onTogglePinCursor: () => { if (cursorPort) togglePin(cursorPort.port) },
+    onKillCursor: () => {
+      const port = liveCursorPort()
+      if (port) kill.requestKill(port)
+    },
+    onTogglePinCursor: () => {
+      const port = liveCursorPort()
+      if (port) togglePin(port.port)
+    },
     onToggleSelectCursor: toggleCursorSelection,
     onCopyCursor: () => {
-      if (cursorPort) actions.copy(`${cursorPort.port}:${cursorPort.pid}`, `${cursorPort.port}:${cursorPort.pid}`)
+      const port = liveCursorPort()
+      if (port) actions.copy(`${port.port}:${port.pid}`, `${port.port}:${port.pid}`)
     },
     onSelectAll: () => changeSelection(new Set(filteredPorts.filter(p => !p.is_protected).map(portKey))),
     onRefresh: () => { refresh({ manual: true }) },

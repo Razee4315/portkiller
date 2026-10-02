@@ -6,7 +6,7 @@ export interface GlobalKeyHandlers {
   /** A dialog or menu is open and owns the keyboard. */
   overlayOpen: boolean
   /** A row is highlighted, so row shortcuts have something to act on. */
-  hasCursor: boolean
+  hasCursor: () => boolean
   /** One step of the Escape ladder: cancel, close, clear, then hide. */
   onEscape: () => void
   onMoveCursor: (delta: 1 | -1) => void
@@ -83,7 +83,7 @@ export function useGlobalKeys(handlers: GlobalKeyHandlers): void {
         if (key === 'a') {
           e.preventDefault()
           h.onSelectAll()
-        } else if (key === 'c' && h.hasCursor) {
+        } else if (key === 'c' && h.hasCursor()) {
           e.preventDefault()
           h.onCopyCursor()
         }
@@ -114,26 +114,26 @@ export function useGlobalKeys(handlers: GlobalKeyHandlers): void {
           h.onToggleHistory()
           return
         case 'Delete':
-          if (h.hasCursor) {
+          if (h.hasCursor()) {
             e.preventDefault()
             h.onKillCursor()
           }
           return
         case 'Enter':
           // A focused button keeps Enter for itself.
-          if (h.hasCursor && !onButton) {
+          if (h.hasCursor() && !onButton) {
             e.preventDefault()
             h.onKillCursor()
           }
           return
         case ' ':
-          if (h.hasCursor && !onButton) {
+          if (h.hasCursor() && !onButton) {
             e.preventDefault()
             h.onToggleSelectCursor()
           }
           return
         case 'p':
-          if (h.hasCursor) {
+          if (h.hasCursor()) {
             e.preventDefault()
             h.onTogglePinCursor()
             return
