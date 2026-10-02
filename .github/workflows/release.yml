@@ -1,9 +1,10 @@
 name: Release
 
+# Releases are cut deliberately: run this workflow from the Actions tab once
+# the "Unreleased" section of CHANGELOG.md describes what is shipping. Every
+# release reaches users as an in-app update prompt, so merging to main must
+# not publish one by itself.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
