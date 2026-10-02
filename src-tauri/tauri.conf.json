@@ -53,19 +53,7 @@
     ],
     "resources": [],
     "externalBin": [],
-    "targets": "all",
-    "linux": {
-      "deb": {
-        "depends": []
-      }
-    },
-    "macOS": {
-      "entitlements": null,
-      "exceptionDomain": "",
-      "frameworks": [],
-      "providerShortName": null,
-      "signingIdentity": null
-    },
+    "targets": ["nsis", "msi"],
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
