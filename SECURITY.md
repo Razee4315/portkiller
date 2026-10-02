@@ -26,4 +26,5 @@ PortKiller includes the following security measures:
 - Protected system processes cannot be killed (svchost, csrss, explorer, etc.)
 - PIDs 0 and 4 are blacklisted
 - Admin elevation is required for killing services
-- No network communication (fully offline)
+- The backend re-checks the process name and port ownership before every kill, so a stale list or a reused PID cannot terminate the wrong process
+- Network use is limited to the update check: one request to GitHub Releases at launch (can be turned off in Settings) and when you press "Check for updates". Updates are signature-verified and never installed without your confirmation. Nothing about your ports or processes leaves the machine.
