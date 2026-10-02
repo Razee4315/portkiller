@@ -4,20 +4,26 @@ export interface PortInfo {
   protocol: string;
   process_name: string;
   process_path: string;
+  /** Full command line; empty when the process belongs to another user. */
+  command_line: string;
   is_protected: boolean;
   local_address: string;
 }
 
 export interface AppState {
   ports: PortInfo[];
-  last_updated: number;
   is_admin: boolean;
 }
 
+/** Mirrors the Rust `KillCode` enum. */
+export type KillCode = 'ok' | 'protected' | 'gone' | 'stale' | 'denied' | 'failed';
+
 export interface KillResult {
-  success: boolean;
-  message: string;
-  port: number;
+  code: KillCode;
+  /** Name the backend resolved for the PID at kill time. */
+  process_name: string;
+  /** OS error text; only set when `code` is 'failed'. */
+  detail: string;
 }
 
 export interface CommonPort {
@@ -43,12 +49,13 @@ export const COMMON_PORTS: CommonPort[] = [
 
 const CUSTOM_PORTS_KEY = 'portkiller_custom_ports';
 
-export function loadCustomPorts(): CommonPort[] {
+/** The user's edited grid, or null when they are still on the defaults. */
+export function loadCustomPorts(): CommonPort[] | null {
   try {
     const stored = localStorage.getItem(CUSTOM_PORTS_KEY);
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [];
+    if (!stored) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return null;
     // Defensive validation — corrupted localStorage shouldn't crash the app
     // or let stray fields slip into the UI. Cap description length to match
     // the SettingsPanel input.
@@ -65,20 +72,19 @@ export function loadCustomPorts(): CommonPort[] {
         description: String(p.description).slice(0, 32),
       }));
   } catch { }
-  return [];
+  return null;
 }
 
-export function saveCustomPorts(ports: CommonPort[]): void {
+/** Pass null to go back to the built-in defaults. An empty list is kept. */
+export function saveCustomPorts(ports: CommonPort[] | null): void {
   try {
-    if (ports.length === 0) {
+    if (ports === null) {
       localStorage.removeItem(CUSTOM_PORTS_KEY);
     } else {
       localStorage.setItem(CUSTOM_PORTS_KEY, JSON.stringify(ports));
     }
   } catch { }
 }
-
-export type ChangeState = 'new' | 'removed' | 'stable';
 
 export interface ProcessDetails {
   pid: number;
@@ -98,8 +104,8 @@ export function loadPinnedPorts(): number[] {
   try {
     const raw = localStorage.getItem(PINNED_PORTS_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter(n => typeof n === 'number');
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((n): n is number => typeof n === 'number');
   } catch { }
   return [];
 }
@@ -127,7 +133,7 @@ export function loadKillHistory(): KillRecord[] {
   try {
     const raw = localStorage.getItem(KILL_HISTORY_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((r): r is KillRecord =>
@@ -163,4 +169,15 @@ export function getSkippedUpdateVersion(): string | null {
 
 export function setSkippedUpdateVersion(version: string): void {
   try { localStorage.setItem(SKIPPED_UPDATE_KEY, version); } catch { }
+}
+
+// First-run hint — shown once so a new user learns the app lives in the tray.
+const ONBOARDED_KEY = 'portkiller_onboarded_v1';
+
+export function hasSeenOnboarding(): boolean {
+  try { return localStorage.getItem(ONBOARDED_KEY) === '1'; } catch { return true; }
+}
+
+export function markOnboardingSeen(): void {
+  try { localStorage.setItem(ONBOARDED_KEY, '1'); } catch { }
 }

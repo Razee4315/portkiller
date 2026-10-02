@@ -1,8 +1,8 @@
 import type { JSX } from 'preact'
-import { useEffect, useMemo, useRef } from 'preact/hooks'
+import { useMemo } from 'preact/hooks'
 import type { UpdaterState } from '../hooks/useUpdater'
 import { Icons } from './Icons'
-import { useFocusTrap } from '../hooks/useFocusTrap'
+import { Modal } from './Modal'
 
 /**
  * The GitHub release body is what `update.body` carries. The release workflow
@@ -93,7 +93,7 @@ function renderNotes(text: string): JSX.Element[] {
       out.push(
         <p
           key={`h-${key++}`}
-          className="mt-3 mb-1 first:mt-0 text-[11px] font-semibold uppercase tracking-wider text-gray-500"
+          className="mt-3 mb-1 first:mt-0 text-[11px] font-semibold uppercase tracking-wider text-gray-400"
         >
           {renderInline(heading[1])}
         </p>,
@@ -120,8 +120,8 @@ function renderNotes(text: string): JSX.Element[] {
  * "Update available" dialog. Purely presentational — the {@link useUpdater}
  * hook drives all state. Renders nothing until an update is found, then offers
  * Update now / Later / Skip this version, shows a download progress bar, and
- * lists the release's changelog. Matches PortKiller's modal conventions
- * (overlay, focus trap, Esc-to-dismiss) from SettingsPanel.
+ * lists the release's changelog. Escape dismisses it like "Later" (handled by
+ * the app-level key handler) except while a download or install is running.
  */
 export function UpdateDialog({
   update,
@@ -132,10 +132,7 @@ export function UpdateDialog({
   skip,
   dismiss,
 }: UpdaterState): JSX.Element | null {
-  const modalRef = useRef<HTMLDivElement>(null)
   const busy = phase === 'downloading' || phase === 'installed'
-
-  useFocusTrap(modalRef, [update !== null])
 
   // Boilerplate-stripped notes. Empty when the body carries only install
   // instructions — the dialog then just shows the version line.
@@ -144,34 +141,18 @@ export function UpdateDialog({
     [update],
   )
 
-  // Esc dismisses like "Later". Disabled while busy: an in-flight download /
-  // install can't be cancelled, so dismissal would only hide a process the user
-  // still has to wait out.
-  useEffect(() => {
-    if (!update || busy) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        dismiss()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [update, busy, dismiss])
-
   if (!update) return null
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Update available"
+    // An in-flight download or install can't be cancelled, so the dialog
+    // can't be dismissed while one is running.
+    <Modal
+      label="Update available"
+      widthClass="w-[440px]"
+      dismissible={!busy}
+      onClose={dismiss}
+      trapDeps={[phase]}
     >
-      <div
-        ref={modalRef}
-        className="bg-dark-900 border border-dark-500 rounded-xl w-[440px] max-w-[92vw] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
-      >
         <div className="flex items-start gap-3 px-5 pt-5 pb-4">
           <div className="w-10 h-10 shrink-0 rounded-lg bg-accent-blue/10 flex items-center justify-center">
             <Icons.Download className="w-5 h-5 text-accent-blue" />
@@ -188,7 +169,7 @@ export function UpdateDialog({
 
         {notes && phase === 'available' && (
           <div className="px-5 pb-1">
-            <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+            <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
               <Icons.Bell className="w-3.5 h-3.5 text-accent-blue" />
               What's new
             </div>
@@ -238,13 +219,17 @@ export function UpdateDialog({
               </>
             )}
             {phase === 'error' && (
-              <button onClick={dismiss} className="btn btn-ghost px-3" type="button">
-                Close
-              </button>
+              <>
+                <button onClick={dismiss} className="btn btn-ghost px-3" type="button">
+                  Close
+                </button>
+                <button onClick={install} className="btn btn-primary px-4" type="button">
+                  Try again
+                </button>
+              </>
             )}
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }

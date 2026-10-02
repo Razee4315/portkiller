@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getSkippedUpdateVersion, setSkippedUpdateVersion } from '../types'
+import { errorMessage } from '../lib/system'
+import type { ShowToast } from './useToast'
 
 export type UpdatePhase =
   | 'idle'
@@ -9,8 +11,6 @@ export type UpdatePhase =
   | 'downloading'
   | 'installed'
   | 'error'
-
-type ShowToast = (message: string, type: 'success' | 'error') => void
 
 export interface UpdaterState {
   /** The pending update, or null when there's nothing to install. */
@@ -31,13 +31,14 @@ export interface UpdaterState {
  * Owns the auto-updater lifecycle so the launch dialog and the Settings
  * "Check for updates" button share one source of truth.
  *
- * On mount it checks GitHub Releases (the signed `latest.json` pointed at by
- * `tauri.conf.json`) exactly once. The check is SILENT on failure — dev builds
+ * On mount, unless the user turned launch checks off, it checks GitHub
+ * Releases (the signed `latest.json` pointed at by `tauri.conf.json`)
+ * exactly once. The check is SILENT on failure — dev builds
  * have no matching release and offline machines can't reach GitHub, and neither
  * should ever see an error popup they can't act on. A version the user chose to
  * "Skip" is remembered and suppressed.
  */
-export function useUpdater(showToast?: ShowToast): UpdaterState {
+export function useUpdater(showToast: ShowToast, checkOnLaunch: boolean): UpdaterState {
   const [update, setUpdate] = useState<Update | null>(null)
   const [phase, setPhase] = useState<UpdatePhase>('idle')
   const [progress, setProgress] = useState(0)
@@ -47,7 +48,11 @@ export function useUpdater(showToast?: ShowToast): UpdaterState {
   // async callback depend on the `checking` state value.
   const checkingRef = useRef(false)
 
+  // Read once: toggling the preference later must not trigger a check.
+  const checkOnLaunchRef = useRef(checkOnLaunch)
+
   useEffect(() => {
+    if (!checkOnLaunchRef.current) return
     let cancelled = false
     ;(async () => {
       try {
@@ -77,13 +82,10 @@ export function useUpdater(showToast?: ShowToast): UpdaterState {
         setUpdate(upd)
         setPhase('available')
       } else {
-        showToast?.("You're on the latest version", 'success')
+        showToast("You're on the latest version", 'success')
       }
     } catch (e) {
-      showToast?.(
-        'Update check failed: ' + (e instanceof Error ? e.message : String(e)),
-        'error',
-      )
+      showToast(`Update check failed: ${errorMessage(e)}`, 'error')
     } finally {
       checkingRef.current = false
       setChecking(false)
@@ -112,7 +114,7 @@ export function useUpdater(showToast?: ShowToast): UpdaterState {
       // The installer has replaced the binary on disk; relaunch into it.
       await relaunch()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorMessage(e))
       setPhase('error')
     }
   }, [update])
