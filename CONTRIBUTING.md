@@ -21,10 +21,23 @@ Contributions are welcome! Here's how to get started.
    npm run tauri dev
    ```
 
-4. **Build for production**
+4. **Run the unit tests**
+   ```bash
+   npm test
+   ```
+
+5. **Build for production**
    ```bash
    npm run tauri build
    ```
+
+## Releasing
+
+Releases are not automatic. When `main` is ready to ship:
+
+1. Make sure the `[Unreleased]` section of `CHANGELOG.md` describes the changes. It becomes the "What's new" text users see in the update dialog.
+2. Run the **Release** workflow from the Actions tab. Leave the version empty for a patch release, or enter one (for example `1.2.0`) for a minor or major release. It builds the installers and publishes the GitHub release.
+3. Rename the `[Unreleased]` heading to the published version and start a new empty `[Unreleased]` section.
 
 ## Pull Request Process
 

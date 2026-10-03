@@ -23,15 +23,8 @@ export const Icons = {
     </svg>
   ),
 
-  Kill: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  ),
-
-  // Same shape as Kill but semantically distinct. Used for window/modal close,
-  // dismissing toasts, clearing search — never for "kill process".
+  // Window/modal close, dismissing toasts, clearing search — never for
+  // "kill process", which uses Trash.
   Close: ({ className }: IconProps): JSX.Element => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" />
@@ -135,13 +128,6 @@ export const Icons = {
     </svg>
   ),
 
-  Port: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-    </svg>
-  ),
-
   Process: ({ className }: IconProps): JSX.Element => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
@@ -154,18 +140,6 @@ export const Icons = {
       <line x1="20" y1="14" x2="23" y2="14" />
       <line x1="1" y1="9" x2="4" y2="9" />
       <line x1="1" y1="14" x2="4" y2="14" />
-    </svg>
-  ),
-
-  DotFree: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 12 12" fill="currentColor">
-      <circle cx="6" cy="6" r="5" />
-    </svg>
-  ),
-
-  DotUsed: ({ className }: IconProps): JSX.Element => (
-    <svg className={className} viewBox="0 0 12 12" fill="currentColor">
-      <circle cx="6" cy="6" r="5" />
     </svg>
   ),
 
@@ -217,6 +191,23 @@ export const Icons = {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  ),
+  Dot: ({ className }: IconProps): JSX.Element => (
+    <svg className={className} viewBox="0 0 12 12" fill="currentColor">
+      <circle cx="6" cy="6" r="5" />
+    </svg>
+  ),
+
+  Check: ({ className }: IconProps): JSX.Element => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+
+  ChevronDown: ({ className }: IconProps): JSX.Element => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   ),
 }

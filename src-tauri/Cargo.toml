@@ -14,12 +14,14 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-global-shortcut = "2"
+# A second launch surfaces the running instance instead of starting another.
+tauri-plugin-single-instance = "2"
 # Auto-update from GitHub Releases (signed latest.json) + relaunch after install.
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde = { version = "1.0", features = ["derive"] }
+# Not used in our code, but tauri::generate_context!() expands to serde_json calls.
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
 netstat2 = "0.9"
 sysinfo = "0.31"
 windows = { version = "0.58", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_Security"] }

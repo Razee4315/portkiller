@@ -7,9 +7,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // UI chrome: clean sans-serif. Mono is reserved for ports/PIDs/paths.
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Consolas', 'Monaco', 'monospace'],
+        // System fonts only: nothing is bundled or fetched, so the stack
+        // names what Windows actually has. Mono is for ports, PIDs and paths.
+        sans: ['system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['Cascadia Mono', 'Consolas', 'monospace'],
       },
       colors: {
         // Softer, slightly warm-neutral surfaces — easier on the eye than pure
@@ -26,20 +27,13 @@ export default {
           red: '#ef4444',
           blue: '#60a5fa',
           yellow: '#eab308',
-          amber: '#f59e0b',
         }
       },
       animation: {
-        'shake': 'shake 0.5s ease-in-out',
         'fade-in': 'fadeIn 0.2s ease-out',
         'slide-up': 'slideUp 0.2s ease-out',
       },
       keyframes: {
-        shake: {
-          '0%, 100%': { transform: 'translateX(0)' },
-          '25%': { transform: 'translateX(-4px)' },
-          '75%': { transform: 'translateX(4px)' },
-        },
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },

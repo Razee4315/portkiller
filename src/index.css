@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
     font-size: 13px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -53,7 +53,7 @@
 
   .input-field {
     @apply w-full bg-dark-800 border border-dark-500 rounded-lg px-4 py-2.5;
-    @apply text-white text-[13px] placeholder-gray-500;
+    @apply text-white text-[13px] placeholder-gray-400;
     @apply focus:outline-none focus:border-accent-blue/60 focus:ring-1 focus:ring-accent-blue/30;
     @apply transition-all duration-200;
   }
@@ -78,40 +78,76 @@
     @apply focus:ring-gray-500/30;
   }
 
+  /* Above the modal layer (z-50): feedback for an action taken inside a
+     dialog must not be dimmed by that dialog's overlay. Opaque base colour so
+     the text stays readable over whatever is underneath. */
+  .toast-layer {
+    @apply fixed bottom-4 inset-x-4 z-[60] flex justify-center pointer-events-none;
+  }
+
+  /* Centered by the layer, not by a transform: the slide-up animation owns
+     `transform` and would otherwise knock the toast off-centre while it runs. */
   .toast {
-    @apply fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg;
-    @apply text-xs font-medium shadow-lg z-50;
+    @apply px-4 py-2.5 rounded-lg bg-dark-800 border pointer-events-auto;
+    @apply text-xs font-medium shadow-lg;
     @apply animate-slide-up;
   }
 
   .toast-success {
-    @apply bg-accent-green/15 text-accent-green border border-accent-green/25;
+    @apply text-accent-green border-accent-green/40;
   }
 
   .toast-error {
-    @apply bg-accent-red/15 text-accent-red border border-accent-red/25;
+    @apply text-accent-red border-accent-red/40;
+  }
+
+  .toast-info {
+    @apply text-accent-blue border-accent-blue/40;
   }
 
   .list-row {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg;
-    @apply hover:bg-dark-700 transition-all duration-150;
-    @apply focus-within:ring-1 focus-within:ring-accent-blue/30;
+    @apply hover:bg-dark-700 transition-colors duration-150;
   }
 
   .list-row-protected {
-    @apply opacity-50;
+    @apply opacity-70;
   }
 
+  /* Ticked for a bulk kill: a filled tint (plus the checkbox in the row). */
   .list-row-selected {
-    @apply bg-dark-700 ring-1 ring-accent-blue/40;
+    @apply bg-accent-blue/10 hover:bg-accent-blue/15;
   }
 
-  .port-new {
-    @apply bg-accent-green/[0.08] border-l-2 border-l-accent-green;
+  /* The keyboard cursor: an outline, so it reads differently from a tick
+     and the two can be on the same row at once. */
+  .list-row-cursor {
+    @apply ring-1 ring-inset ring-accent-blue/70;
   }
 
-  .port-removed {
-    @apply bg-accent-red/[0.08] opacity-50;
+  .list-row-new {
+    @apply bg-accent-green/10;
+  }
+
+  .list-row-pending {
+    @apply ring-1 ring-inset ring-accent-red/60 bg-accent-red/5;
+  }
+
+  /* Small icon button at the end of a row. */
+  .row-action {
+    @apply p-1.5 rounded-md text-gray-300 opacity-60 transition-opacity;
+    @apply group-hover:opacity-100 hover:text-white hover:bg-dark-600;
+    @apply focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-blue/40;
+  }
+
+  .kbd {
+    @apply px-1.5 py-0.5 rounded bg-dark-700 border border-dark-500;
+    @apply font-mono text-[11px] text-gray-200;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded;
+    @apply bg-dark-700 border border-dark-600 text-gray-200 text-[11px];
   }
 
   .modal-overlay {
