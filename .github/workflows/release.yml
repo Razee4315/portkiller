@@ -6,6 +6,11 @@ name: Release
 # not publish one by itself.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.1.0. Leave empty to bump the patch number of the latest tag.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -20,13 +25,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Auto-increment version
+      - name: Resolve version
         id: version
         shell: bash
+        env:
+          REQUESTED: ${{ inputs.version }}
         run: |
           # Get the latest version tag, sorted by semver
           LATEST_TAG=$(git tag -l "v*" --sort=-v:refname | head -n1)
-          if [ -z "$LATEST_TAG" ]; then
+          if [ -n "$REQUESTED" ]; then
+            # Minor and major releases are chosen by a person, not inferred.
+            if ! [[ "$REQUESTED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::version must look like 1.2.3, got '$REQUESTED'"
+              exit 1
+            fi
+            NEW_VERSION="$REQUESTED"
+          elif [ -z "$LATEST_TAG" ]; then
             NEW_VERSION="1.0.0"
           else
             VERSION=${LATEST_TAG#v}
@@ -45,7 +59,8 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
           # Update Cargo.toml
           sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
-          npm version "$VERSION" --no-git-tag-version
+          # The release commit may already carry this version.
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
           echo "Updated version to $VERSION"
 
       # Build the release body from the top CHANGELOG section so the updater's
