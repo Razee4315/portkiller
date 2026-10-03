@@ -2,30 +2,30 @@
 
 Branch: `audit/full-implementation`. Status values: `todo` / `in-progress` / `done` / `verified` / `blocked`.
 
-Environment note: this machine has no Rust toolchain (`cargo`, `rustc`, MSVC build tools are all absent), so Rust changes cannot be compiled and the native app cannot be launched here. Frontend behaviour is verified in a browser against a mocked Tauri IPC layer. Items whose fix lives in Rust are marked `blocked` once the code is written, meaning "implemented, awaiting a compile and a native run".
+Environment note: the machine this was written on has no Rust toolchain, so the Rust changes were first compiled by CI on the pull request (Razee4315/portkiller#11), where `cargo check`, clippy and rustfmt pass. Frontend behaviour was verified in a browser against a mocked Tauri IPC layer. Items whose fix lives in Rust stay `blocked` until someone launches a built app and walks the checklist.
 
 ## Findings
 
 | ID | Tier | Item | Status | How verified / why blocked |
 |---|---|---|---|---|
-| F-01 | 1 | Show window on launch; surface existing instance on second launch | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Frontend half (signals ready after restoring geometry) exercised in the harness. |
-| F-02 | 1 | Alt+P focuses a visible-but-unfocused window instead of hiding | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
+| F-01 | 1 | Show window on launch; surface existing instance on second launch | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Frontend half (signals ready after restoring geometry) exercised in the harness. |
+| F-02 | 1 | Alt+P focuses a visible-but-unfocused window instead of hiding | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
 | F-03 | 1 | Focus and select search on re-open | verified | Browser harness (real UI, mocked Tauri IPC): emitted the window-focus event, search focused with its text selected; skipped while a dialog is open. |
 | F-04 | 1 | Gate global shortcuts behind modals and inputs | verified | Browser harness (real UI, mocked Tauri IPC): h, j, k, /, Delete, Enter, Space, Ctrl+A inside a Settings field are not intercepted; no cursor move, no pending kill, zero kill calls. Real-key test: Enter in search no longer also arms a kill. |
 | F-05 | 1 | Distinct cursor vs multi-select styling | verified | Browser harness (real UI, mocked Tauri IPC): a click moves the cursor only; Ctrl+click and Space tick rows; one cursor ring, ticks drawn as checkbox plus tint. |
 | F-06 | 1 | In-place kill confirmation (Details, context menu, `kill N`) | verified | Browser harness (real UI, mocked Tauri IPC): details and context-menu Kill arm in place and kill on the second press; "kill 5173" keeps its text, second Enter kills, pending row stays visible. |
 | F-07 | 1 | Strict Enter parsing in search | verified | Browser harness (real UI, mocked Tauri IPC) + unit tests: Enter on "3000-6000" or "3001abc" arms nothing; Enter on text moves the cursor to the first result. |
-| F-08 | 1 | Backend re-verifies PID, name and port before kill | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
-| F-09 | 1 | Typed kill error codes | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Frontend wording for every kill code verified in the harness. |
+| F-08 | 1 | Backend re-verifies PID, name and port before kill | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
+| F-09 | 1 | Typed kill error codes | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Frontend wording for every kill code verified in the harness. |
 | F-10 | 1 | Cursor tracked by row key | verified | Browser harness (real UI, mocked Tauri IPC): inserted a lower port and refreshed; the cursor stayed on the same port-pid. Cursor resets on a new query. A same-tick burst (three moves, Space, move, Enter) acts on exactly the rows moved to. |
 | F-11 | 1 | Refresh feedback | verified | Browser harness (real UI, mocked Tauri IPC): refresh button spins and disables during a manual refresh, then returns to idle. |
 | F-12 | 1 | Stop polling while hidden | verified | Browser harness (real UI, mocked Tauri IPC): with the window reported hidden, 0 list fetches in 4.5 s; visible, 2 fetches. Depends on Tauri isVisible, exercised only through the mock. |
 | F-13 | 1 | "Removed" highlight: remove dead code and README claim | verified | Removed the "removed" state, its CSS and the README claim; grep finds no references; new-row highlight still works in the harness. |
 | F-14 | 1 | Accessibility: list semantics, roving tab stops, contrast | verified | Browser harness (real UI, mocked Tauri IPC): list/listitem roles, aria-current on the cursor row, row buttons tabbable only on the cursor row, protocol radiogroup, combobox wired to suggestions; resting opacities raised; no gray-500 text left. |
 | F-15 | 1 | Key by port-pid everywhere | verified | Browser harness (real UI, mocked Tauri IPC) + unit tests: in-flight kills keyed by port-pid; grid and kill-by-number prefer a killable TCP owner. |
-| F-16 | 1 | Hotkey registration failure is non-fatal | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
-| F-17 | 2 | Admin restart survives UAC cancel | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Frontend flow verified in the harness: a cancelled prompt leaves the app running, the button re-enables, an error toast is shown. |
-| F-18 | 2 | Open Folder / Task Manager work and report errors | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Frontend verified in the harness: calls the new commands, a failure shows a toast, the menu closes. |
+| F-16 | 1 | Hotkey registration failure is non-fatal | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
+| F-17 | 2 | Admin restart survives UAC cancel | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Frontend flow verified in the harness: a cancelled prompt leaves the app running, the button re-enables, an error toast is shown. |
+| F-18 | 2 | Open Folder / Task Manager work and report errors | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Frontend verified in the harness: calls the new commands, a failure shows a toast, the menu closes. |
 | F-19 | 2 | Bulk kill: dedupe by PID, real count, busy state | verified | Browser harness (real UI, mocked Tauri IPC): three ports of one PID show "Kill 1 process"; protected row excluded; changing the selection disarms; button disabled while busy; "Killed 2 of 2 processes". |
 | F-20 | 2 | `kill all` scoped to visible list | verified | Browser harness (real UI, mocked Tauri IPC): with the UDP filter on, "kill all" selected only the 5 visible killable rows. |
 | F-21 | 2 | Toast above modal overlays | verified | Browser harness (real UI, mocked Tauri IPC): toast layer z-index 60 vs dialog 50; toast shown above Settings and Details. |
@@ -47,13 +47,13 @@ Environment note: this machine has no Rust toolchain (`cargo`, `rustc`, MSVC bui
 
 | ID | Item | Status | How verified / why blocked |
 |---|---|---|---|
-| M-01 | Command line per process | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Row hint, details field, search-by-command and CSV column verified in the harness and unit tests. |
+| M-01 | Command line per process | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Row hint, details field, search-by-command and CSV column verified in the harness and unit tests. |
 | M-02 | First-run hint | verified | Browser harness (real UI, mocked Tauri IPC): banner shown on first run with the current shortcut, dismissed and remembered. |
-| M-03 | Start with Windows | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Settings toggle verified in the harness (reads state, writes, rolls back on error). |
-| M-04 | Configurable hotkey | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. Capture UI verified in the harness and unit tests: bare key rejected; failed registration reverts and re-registers the previous shortcut; success persists and updates the footer. |
+| M-03 | Start with Windows | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Settings toggle verified in the harness (reads state, writes, rolls back on error). |
+| M-04 | Configurable hotkey | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. Capture UI verified in the harness and unit tests: bare key rejected; failed registration reverts and re-registers the previous shortcut; success persists and updates the footer. |
 | M-05 | Type-to-search from anywhere | verified | Browser harness (real UI, mocked Tauri IPC) (real keys): typing digits with the list focused lands in the search box. |
 | M-06 | Post-kill verification | verified | Browser harness (real UI, mocked Tauri IPC): success toast only when the port is gone; "still held by python.exe (PID 4999)" when something re-binds. |
-| M-07 | Kill process tree | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. In-place confirm for tree kill verified in the harness (details panel and context menu send tree=true). |
+| M-07 | Kill process tree | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. In-place confirm for tree kill verified in the harness (details panel and context menu send tree=true). |
 | M-08 | Automated tests | verified | vitest added; 43 tests over ports, commands, format, hotkey and preferences pass; CI runs npm test. |
 | M-09 | Code signing | blocked | Needs a code-signing certificate (a purchase plus a repo secret). Nothing to implement until one exists. |
 | M-10 | User "never kill" list | verified | Browser harness (real UI, mocked Tauri IPC): adding postgres.exe marks its row Protected, disables its grid card and excludes it from bulk kill. Frontend-only guard. |
@@ -68,7 +68,7 @@ Environment note: this machine has no Rust toolchain (`cargo`, `rustc`, MSVC bui
 | C-04 | Remove unused crates (`tokio`, `serde_json`) | blocked | `tokio` removed. `serde_json` restored after CI showed `tauri::generate_context!()` needs it. Cargo.lock is regenerated by cargo on each CI build until a machine with Rust commits it. |
 | C-05 | Remove `bun.lock` | verified | bun.lock removed; CI uses npm. |
 | C-06 | Remove stale audit docs, `newlogo.svg`, `images/.gitkeep` | verified | Removed both stale audit docs, images/.gitkeep, and newlogo.svg (byte-identical to src-tauri/icons/icon.svg). |
-| C-07 | Remove unused backend fields | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
+| C-07 | Remove unused backend fields | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
 | C-08 | Remove empty branch and unreachable error mapping | verified | Empty branch gone with the polling rewrite; error wording is now driven by kill codes. |
 | C-09 | `embed-icon.cjs` / `rcedit` redundancy | blocked | Left in place: confirming that tauri-build already embeds the icon needs a release build. |
 | C-10 | Font stack: stop naming fonts that never load | verified | Font stacks name only system fonts; rendering unchanged in the harness. |
@@ -82,8 +82,8 @@ Environment note: this machine has no Rust toolchain (`cargo`, `rustc`, MSVC bui
 
 | ID | Item | Status | How verified / why blocked |
 |---|---|---|---|
-| O-01 | Async Tauri commands | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
-| O-02 | Lighter process refresh | blocked | Code written; not compiled or run natively (no Rust toolchain on this machine). Needs `cargo check`, clippy, fmt and a native run. |
+| O-01 | Async Tauri commands | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
+| O-02 | Lighter process refresh | blocked | Compiles and passes clippy and rustfmt in CI (run 37089140057). Not yet run natively: needs a launch of the built app. |
 | O-03 | Isolate footer clock; memoized rows | verified | Footer clock is a leaf component reading a ref; rows memoized with a small local helper instead of preact/compat. |
 | O-04 | Skip state update when the port list is unchanged | verified | usePorts keeps the previous state object when a poll returns identical rows (comparison unit-tested). |
 | O-05 | List virtualization (audit: not needed) | verified | No change, as the audit concluded: not needed at 50-150 rows once O-03 and O-04 landed. |
